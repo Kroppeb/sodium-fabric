@@ -19,7 +19,7 @@ public class MixinBufferRenderer {
      * @reason Avoid client side memory to speed up rendering
      */
     @Overwrite
-    private static void draw(ByteBuffer buffer, int mode, VertexFormat vertexFormat, int count) {
+    private static void draw(ByteBuffer buffer, VertexFormat.DrawMode drawMode, VertexFormat vertexFormat, int count, VertexFormat.IntType intType, int j, boolean bl) {
         buffer.clear();
 
         if (count <= 0) {
@@ -36,7 +36,7 @@ public class MixinBufferRenderer {
 
         vertexFormat.startDrawing(0L);
 
-        GlStateManager.drawArrays(mode, 0, count);
+        GlStateManager.drawElements(drawMode.mode, 0, count, 0L);
 
         vertexFormat.endDrawing();
 

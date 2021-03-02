@@ -17,6 +17,7 @@ import net.minecraft.world.chunk.EmptyChunk;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightingProvider;
 
+import java.util.BitSet;
 import java.util.concurrent.locks.StampedLock;
 
 /**
@@ -97,13 +98,13 @@ public class SodiumChunkManager extends ClientChunkManager implements ChunkStatu
     }
 
     @Override
-    public WorldChunk loadChunkFromPacket(int x, int z, BiomeArray biomes, PacketByteBuf buf, CompoundTag tag, int verticalStripBitmask, boolean complete) {
+    public WorldChunk loadChunkFromPacket(int x, int z, BiomeArray biomes, PacketByteBuf buf, CompoundTag tag, BitSet verticalStripBitmask) {
         long key = createChunkKey(x, z);
 
         WorldChunk chunk = this.chunks.get(key);
 
         // If the chunk does not yet exist, create it now
-        if (!complete && chunk != null) {
+        if (chunk != null) {
             chunk.loadFromPacket(biomes, buf, tag, verticalStripBitmask);
         } else {
             // [VanillaCopy] If the packet didn't contain any biome data and the chunk doesn't exist yet, abort
@@ -181,19 +182,21 @@ public class SodiumChunkManager extends ClientChunkManager implements ChunkStatu
     }
 
     private void onChunkLoaded(int x, int z, WorldChunk chunk) {
+        ChunkPos chunkPos = new ChunkPos(x, z);
+
         // [VanillaCopy] Mark the chunk as eligible for block and sky lighting
         LightingProvider lightEngine = this.getLightingProvider();
-        lightEngine.setColumnEnabled(new ChunkPos(x, z), true);
+        lightEngine.setColumnEnabled(chunkPos, true);
 
         ChunkSection[] sections = chunk.getSectionArray();
 
         // [VanillaCopy] Notify the light engine that this chunk's sections have been updated
         for (int y = 0; y < sections.length; ++y) {
-            lightEngine.setSectionStatus(ChunkSectionPos.from(x, y, z), ChunkSection.isEmpty(sections[y]));
+            lightEngine.setSectionStatus(ChunkSectionPos.from(x, this.world.sectionIndexToCoord(y), z), ChunkSection.isEmpty(sections[y]));
         }
 
         // Sodium doesn't actually use vanilla's global color cache, but we keep it around for compatibility purposes
-        this.world.resetChunkColor(x, z);
+        this.world.resetChunkColor(chunkPos);
 
         // Notify the chunk listener
         if (this.listener != null) {

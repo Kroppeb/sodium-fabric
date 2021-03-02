@@ -117,7 +117,7 @@ public class WorldSlice extends ReusableObject implements BlockRenderView, Biome
 
     public static WorldChunk[] createChunkSlice(World world, ChunkSectionPos pos) {
         WorldChunk chunk = world.getChunk(pos.getX(), pos.getZ());
-        ChunkSection section = chunk.getSectionArray()[pos.getY()];
+        ChunkSection section = chunk.getSectionArray()[world.sectionCoordToIndex(pos.getY())];
 
         // If the chunk section is absent or empty, simply terminate now. There will never be anything in this chunk
         // section to render, so we need to signal that a chunk render task shouldn't created. This saves a considerable
@@ -224,7 +224,7 @@ public class WorldSlice extends ReusableObject implements BlockRenderView, Biome
     }
 
     private void populateBlockArrays(int sectionIdx, ChunkSectionPos pos, Chunk chunk) {
-        ChunkSection section = getChunkSection(chunk, pos);
+        ChunkSection section = this.getChunkSection(chunk, pos);
 
         if (section == null || section.isEmpty()) {
             section = EMPTY_SECTION;
@@ -447,13 +447,23 @@ public class WorldSlice extends ReusableObject implements BlockRenderView, Biome
         return z << TABLE_BITS | x;
     }
 
-    private static ChunkSection getChunkSection(Chunk chunk, ChunkSectionPos pos) {
+    private ChunkSection getChunkSection(Chunk chunk, ChunkSectionPos pos) {
         ChunkSection section = null;
 
-        if (!World.isHeightInvalid(ChunkSectionPos.getBlockCoord(pos.getY()))) {
-            section = chunk.getSectionArray()[pos.getY()];
+        if (!chunk.isOutOfHeightLimit(ChunkSectionPos.getBlockCoord(pos.getY()))) {
+            section = chunk.getSectionArray()[this.world.sectionCoordToIndex(pos.getY())];
         }
 
         return section;
+    }
+
+    @Override
+    public int getHeight() {
+        return this.world.getHeight();
+    }
+
+    @Override
+    public int getBottomY() {
+        return this.world.getBottomY();
     }
 }

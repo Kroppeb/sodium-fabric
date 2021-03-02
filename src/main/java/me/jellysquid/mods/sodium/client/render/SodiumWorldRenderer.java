@@ -26,7 +26,6 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.*;
-import net.minecraft.client.render.block.entity.BlockEntityRenderDispatcher;
 import net.minecraft.client.render.model.ModelLoader;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
@@ -73,8 +72,8 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
     }
 
     /**
-     * @throws IllegalStateException If the renderer has not yet been created
      * @return The current instance of this type
+     * @throws IllegalStateException If the renderer has not yet been created
      */
     public static SodiumWorldRenderer getInstance() {
         if (instance == null) {
@@ -322,7 +321,7 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
                 }
             }
 
-            BlockEntityRenderDispatcher.INSTANCE.render(blockEntity, tickDelta, matrices, consumer);
+            MinecraftClient.getInstance().getBlockEntityRenderDispatcher().render(blockEntity, tickDelta, matrices, consumer);
 
             matrices.pop();
         }
@@ -333,7 +332,7 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
             matrices.push();
             matrices.translate((double) pos.getX() - x, (double) pos.getY() - y, (double) pos.getZ() - z);
 
-            BlockEntityRenderDispatcher.INSTANCE.render(blockEntity, tickDelta, matrices, immediate);
+            MinecraftClient.getInstance().getBlockEntityRenderDispatcher().render(blockEntity, tickDelta, matrices, immediate);
 
             matrices.pop();
         }
@@ -359,6 +358,7 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
 
     /**
      * Returns whether or not the entity intersects with any visible chunks in the graph.
+     *
      * @return True if the entity is visible, otherwise false
      */
     public boolean isEntityVisible(Entity entity) {
