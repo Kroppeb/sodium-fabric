@@ -3,15 +3,12 @@ package me.jellysquid.mods.sodium.client.render.chunk;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
 import net.minecraft.util.math.Direction;
 
-public class ChunkRenderColumn<T extends ChunkGraphicsState> {
-    private final ChunkRenderContainer<T>[] renders;
-
-    @SuppressWarnings("unchecked")
-    private final ChunkRenderColumn<T>[] adjacent = new ChunkRenderColumn[6];
+public class ChunkRenderColumn {
+    private final ChunkRenderContainer[] renders;
+    private final ChunkRenderColumn[] adjacent = new ChunkRenderColumn[6];
 
     private final int x, z;
 
-    @SuppressWarnings("unchecked")
     public ChunkRenderColumn(int x, int z, int sections) {
         this.x = x;
         this.z = z;
@@ -21,19 +18,19 @@ public class ChunkRenderColumn<T extends ChunkGraphicsState> {
         this.setAdjacentColumn(Direction.DOWN, this);
     }
 
-    public void setAdjacentColumn(Direction dir, ChunkRenderColumn<T> column) {
+    public void setAdjacentColumn(Direction dir, ChunkRenderColumn column) {
         this.adjacent[dir.ordinal()] = column;
     }
 
-    public ChunkRenderColumn<T> getAdjacentColumn(Direction dir) {
+    public ChunkRenderColumn getAdjacentColumn(Direction dir) {
         return this.adjacent[dir.ordinal()];
     }
 
-    public void setRender(int y, ChunkRenderContainer<T> render) {
+    public void setRender(int y, ChunkRenderContainer render) {
         this.renders[y] = render;
     }
 
-    public ChunkRenderContainer<T> getRender(int y) {
+    public ChunkRenderContainer getRender(int y) {
         return this.renders[y];
     }
 
@@ -47,7 +44,7 @@ public class ChunkRenderColumn<T extends ChunkGraphicsState> {
 
     public boolean areNeighborsPresent() {
         for (Direction dir : DirectionUtil.HORIZONTAL_DIRECTIONS) {
-            ChunkRenderColumn<T> adj = this.adjacent[dir.ordinal()];
+            ChunkRenderColumn adj = this.adjacent[dir.ordinal()];
 
             if (adj == null) {
                 return false;
