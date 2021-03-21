@@ -471,10 +471,6 @@ public class ChunkRenderManager implements ChunkStatusListener {
     }
 
     public void scheduleRebuild(int x, int y, int z, boolean important) {
-        if (y < this.world.getBottomSectionCoord() || y >= this.world.getTopSectionCoord()) {
-            return;
-        }
-
         ChunkRenderContainer render = this.getRender(x, y, z);
 
         if (render != null) {

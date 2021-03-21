@@ -31,6 +31,9 @@ public class ChunkRenderColumn {
     }
 
     public ChunkRenderContainer getRender(int y) {
+        if (y < 0 || y >= this.renders.length) {
+            return null;
+        }
         return this.renders[y];
     }
 
