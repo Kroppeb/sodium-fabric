@@ -9,6 +9,7 @@ import net.minecraft.client.render.*;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.sound.SoundEvents;
+import org.lwjgl.opengl.GL20C;
 
 import java.util.function.Consumer;
 
