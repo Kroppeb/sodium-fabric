@@ -21,11 +21,11 @@ import org.spongepowered.asm.mixin.Shadow;
 @Mixin(BufferBuilder.class)
 public abstract class MixinBufferBuilder extends FixedColorVertexConsumer {
     @Shadow
-    private boolean field_21594; // is baked quad format
+    private boolean textured; // is baked quad format
 
     @Override
     public void quad(MatrixStack.Entry matrices, BakedQuad quad, float[] brightnessTable, float r, float g, float b, int[] light, int overlay, boolean colorize) {
-        if (!this.field_21594) {
+        if (!this.textured) {
             super.quad(matrices, quad, brightnessTable, r, g, b, light, overlay, colorize);
 
             return;

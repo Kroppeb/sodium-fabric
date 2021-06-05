@@ -6,7 +6,7 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import me.jellysquid.mods.sodium.client.util.collections.FixedLongHashTable;
 import net.minecraft.client.world.ClientChunkManager;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -16,6 +16,7 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.EmptyChunk;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightingProvider;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.BitSet;
 import java.util.concurrent.locks.StampedLock;
@@ -97,13 +98,15 @@ public class SodiumChunkManager extends ClientChunkManager implements ChunkStatu
         return chunk;
     }
 
+
     @Override
-    public WorldChunk loadChunkFromPacket(int x, int z, BiomeArray biomes, PacketByteBuf buf, CompoundTag tag, BitSet verticalStripBitmask) {
+    public WorldChunk loadChunkFromPacket(int x, int z, BiomeArray biomes, PacketByteBuf buf, NbtCompound tag, BitSet verticalStripBitmask) {
         long key = createChunkKey(x, z);
 
         WorldChunk chunk = this.chunks.get(key);
 
         // If the chunk does not yet exist, create it now
+        // TODO: what did the `complete` do?
         if (chunk != null) {
             chunk.loadFromPacket(biomes, buf, tag, verticalStripBitmask);
         } else {

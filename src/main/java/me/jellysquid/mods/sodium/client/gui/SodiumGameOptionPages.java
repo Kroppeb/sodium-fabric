@@ -1,7 +1,6 @@
 package me.jellysquid.mods.sodium.client.gui;
 
 import com.google.common.collect.ImmutableList;
-import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gui.options.*;
 import me.jellysquid.mods.sodium.client.gui.options.control.ControlValueFormatter;
 import me.jellysquid.mods.sodium.client.gui.options.control.CyclingControl;
@@ -97,7 +96,12 @@ public class SodiumGameOptionPages {
                         .setTooltip("If enabled, the game's frame rate will be synchronized to the monitor's refresh rate, making for a generally smoother experience " +
                                 "at the expense of overall input latency. This setting might reduce performance if your system is too slow.")
                         .setControl(TickBoxControl::new)
-                        .setBinding((opts, value) -> opts.enableVsync = value, opts -> opts.enableVsync)
+                        .setBinding((opts, value) -> {
+                            opts.enableVsync = value;
+                            if (MinecraftClient.getInstance().getWindow() != null) {
+                                MinecraftClient.getInstance().getWindow().setVsync(opts.enableVsync);
+                            }
+                        }, opts -> opts.enableVsync)
                         .setImpact(OptionImpact.VARIES)
                         .build())
                 .add(OptionImpl.createBuilder(int.class, vanillaOpts)
