@@ -64,7 +64,7 @@ public class ChunkRenderList<T> {
      */
     public ChunkRenderListIterator<T> iterator(boolean backwards) {
         if (backwards) {
-            return new ChunkRenderListIterator<T>() {
+            return new ChunkRenderListIterator<>() {
                 private int pos = ChunkRenderList.this.size - 1;
 
                 @Override
@@ -88,7 +88,7 @@ public class ChunkRenderList<T> {
                 }
             };
         } else {
-            return new ChunkRenderListIterator<T>() {
+            return new ChunkRenderListIterator<>() {
                 private final int lim = ChunkRenderList.this.size;
 
                 private int pos = 0;

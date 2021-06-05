@@ -3,9 +3,6 @@ package me.jellysquid.mods.sodium.client.render.chunk.shader;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.jellysquid.mods.sodium.client.gl.compat.LegacyFogHelper;
 import org.lwjgl.opengl.GL20C;
-import org.lwjgl.system.MemoryStack;
-
-import java.nio.FloatBuffer;
 
 /**
  * These shader implementations try to remain compatible with the deprecated fixed function pipeline by manually

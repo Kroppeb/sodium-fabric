@@ -176,10 +176,12 @@ public class SodiumGameOptionPages {
                         .build())
                 .add(OptionImpl.createBuilder(SodiumGameOptions.LightingQuality.class, sodiumOpts)
                         .setName("Smooth Lighting")
-                        .setTooltip("Controls the quality of smooth lighting effects.\n" +
-                                "\nOff - No smooth lighting" +
-                                "\nLow - Smooth block lighting only" +
-                                "\nHigh (new!) - Smooth block and entity lighting")
+                        .setTooltip("""
+                                Controls the quality of smooth lighting effects.
+
+                                Off - No smooth lighting
+                                Low - Smooth block lighting only
+                                High (new!) - Smooth block and entity lighting""")
                         .setControl(option -> new CyclingControl<>(option, SodiumGameOptions.LightingQuality.class))
                         .setBinding((opts, value) -> opts.quality.smoothLighting = value, opts -> opts.quality.smoothLighting)
                         .setImpact(OptionImpact.MEDIUM)
