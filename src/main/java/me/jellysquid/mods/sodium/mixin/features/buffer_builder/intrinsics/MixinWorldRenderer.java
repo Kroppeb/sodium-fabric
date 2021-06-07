@@ -72,41 +72,41 @@ public class MixinWorldRenderer {
                 .createSink(VanillaVertexTypes.LINES);
         lines.ensureCapacity(24);
 
-        lines.vertexLine(v1x, v1y, v1z, red, yAxisGreen, zAxisBlue, alpha);
-        lines.vertexLine(v2x, v2y, v2z, red, yAxisGreen, zAxisBlue, alpha);
+        lines.vertexLine(v1x, v1y, v1z, red, yAxisGreen, zAxisBlue, alpha, 1F, 0F, 0F);
+        lines.vertexLine(v2x, v2y, v2z, red, yAxisGreen, zAxisBlue, alpha, 1F, 0F, 0F);
 
-        lines.vertexLine(v1x, v1y, v1z, xAxisRed, green, zAxisBlue, alpha);
-        lines.vertexLine(v3x, v3y, v3z, xAxisRed, green, zAxisBlue, alpha);
+        lines.vertexLine(v1x, v1y, v1z, xAxisRed, green, zAxisBlue, alpha, 0F, 1F, 0F);
+        lines.vertexLine(v3x, v3y, v3z, xAxisRed, green, zAxisBlue, alpha, 0F, 1F, 0F);
 
-        lines.vertexLine(v1x, v1y, v1z, xAxisRed, yAxisGreen, blue, alpha);
-        lines.vertexLine(v4x, v4y, v4z, xAxisRed, yAxisGreen, blue, alpha);
+        lines.vertexLine(v1x, v1y, v1z, xAxisRed, yAxisGreen, blue, alpha, 0F, 0F, 1F);
+        lines.vertexLine(v4x, v4y, v4z, xAxisRed, yAxisGreen, blue, alpha, 0F, 0F, 1F);
 
-        lines.vertexLine(v2x, v2y, v2z, color);
-        lines.vertexLine(v5x, v5y, v5z, color);
+        lines.vertexLine(v2x, v2y, v2z, color, 0F, 1F, 0F);
+        lines.vertexLine(v5x, v5y, v5z, color, 0F, 1F, 0F);
 
-        lines.vertexLine(v5x, v5y, v5z, color);
-        lines.vertexLine(v3x, v3y, v3z, color);
+        lines.vertexLine(v5x, v5y, v5z, color, -1F, 0F, 0F);
+        lines.vertexLine(v3x, v3y, v3z, color, -1F, 0F, 0F);
 
-        lines.vertexLine(v3x, v3y, v3z, color);
-        lines.vertexLine(v6x, v6y, v6z, color);
+        lines.vertexLine(v3x, v3y, v3z, color, 0F, 0F, 1F);
+        lines.vertexLine(v6x, v6y, v6z, color, 0F, 0F, 1F);
 
-        lines.vertexLine(v6x, v6y, v6z, color);
-        lines.vertexLine(v4x, v4y, v4z, color);
+        lines.vertexLine(v6x, v6y, v6z, color, 0F, -1F, 0F);
+        lines.vertexLine(v4x, v4y, v4z, color, 0F, -1F, 0F);
 
-        lines.vertexLine(v4x, v4y, v4z, color);
-        lines.vertexLine(v7x, v7y, v7z, color);
+        lines.vertexLine(v4x, v4y, v4z, color, 1F, 0F, 0F);
+        lines.vertexLine(v7x, v7y, v7z, color, 1F, 0F, 0F);
 
-        lines.vertexLine(v7x, v7y, v7z, color);
-        lines.vertexLine(v2x, v2y, v2z, color);
+        lines.vertexLine(v7x, v7y, v7z, color, 0F, 0F, -1F);
+        lines.vertexLine(v2x, v2y, v2z, color, 0F, 0F, -1F);
 
-        lines.vertexLine(v6x, v6y, v6z, color);
-        lines.vertexLine(v8x, v8y, v8z, color);
+        lines.vertexLine(v6x, v6y, v6z, color, 1F, 0F, 0F);
+        lines.vertexLine(v8x, v8y, v8z, color, 1F, 0F, 0F);
 
-        lines.vertexLine(v7x, v7y, v7z, color);
-        lines.vertexLine(v8x, v8y, v8z, color);
+        lines.vertexLine(v7x, v7y, v7z, color, 0F, 1F, 0F);
+        lines.vertexLine(v8x, v8y, v8z, color, 0F, 1F, 0F);
 
-        lines.vertexLine(v5x, v5y, v5z, color);
-        lines.vertexLine(v8x, v8y, v8z, color);
+        lines.vertexLine(v5x, v5y, v5z, color, 0F, 0F, 1F);
+        lines.vertexLine(v8x, v8y, v8z, color, 0F, 0F, 1F);
 
         lines.flush();
     }
