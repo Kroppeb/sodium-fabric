@@ -11,14 +11,6 @@ public class LineVertexWriterFallback extends VertexWriterFallback implements Li
     }
 
     @Override
-    public void vertexLine(float x, float y, float z, int color) {
-        VertexConsumer consumer = this.consumer;
-        consumer.vertex(x, y, z);
-        consumer.color(ColorABGR.unpackRed(color), ColorABGR.unpackGreen(color), ColorABGR.unpackBlue(color), ColorABGR.unpackAlpha(color));
-        consumer.next();
-    }
-
-    @Override
     public void vertexLine(float x, float y, float z, int color, float nx, float ny, float nz) {
         VertexConsumer consumer = this.consumer;
         consumer.vertex(x, y, z);

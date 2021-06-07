@@ -13,19 +13,6 @@ public class LineVertexBufferWriterNio extends VertexBufferWriterNio implements 
     }
 
     @Override
-    public void vertexLine(float x, float y, float z, int color) {
-        int i = this.writeOffset;
-
-        ByteBuffer buffer = this.byteBuffer;
-        buffer.putFloat(i, x);
-        buffer.putFloat(i + 4, y);
-        buffer.putFloat(i + 8, z);
-        buffer.putInt(i + 12, color);
-
-        this.advance();
-    }
-
-    @Override
     public void vertexLine(float x, float y, float z, int color, float nx, float ny, float nz) {
         int i = this.writeOffset;
 

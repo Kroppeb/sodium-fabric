@@ -12,19 +12,6 @@ public class LineVertexBufferWriterUnsafe extends VertexBufferWriterUnsafe imple
 
     @SuppressWarnings("SuspiciousNameCombination")
     @Override
-    public void vertexLine(float x, float y, float z, int color) {
-        long i = this.writePointer;
-
-        UNSAFE.putFloat(i, x);
-        UNSAFE.putFloat(i + 4, y);
-        UNSAFE.putFloat(i + 8, z);
-        UNSAFE.putInt(i + 12, color);
-
-        this.advance();
-    }
-
-    @SuppressWarnings("SuspiciousNameCombination")
-    @Override
     public void vertexLine(float x, float y, float z, int color, float nx, float ny, float nz) {
         long i = this.writePointer;
 
