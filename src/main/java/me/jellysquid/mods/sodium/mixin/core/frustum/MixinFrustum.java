@@ -10,6 +10,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.nio.FloatBuffer;
+
 @Mixin(Frustum.class)
 public class MixinFrustum implements FrustumExtended {
     private float xF, yF, zF;
@@ -94,5 +96,33 @@ public class MixinFrustum implements FrustumExtended {
                 this.pyX * (this.pyX < 0 ? minX : maxX) + this.pyY * (this.pyY < 0 ? minY : maxY) + this.pyZ * (this.pyZ < 0 ? minZ : maxZ) >= -this.pyW &&
                 this.nzX * (this.nzX < 0 ? minX : maxX) + this.nzY * (this.nzY < 0 ? minY : maxY) + this.nzZ * (this.nzZ < 0 ? minZ : maxZ) >= -this.nzW &&
                 this.pzX * (this.pzX < 0 ? minX : maxX) + this.pzY * (this.pzY < 0 ? minY : maxY) + this.pzZ * (this.pzZ < 0 ? minZ : maxZ) >= -this.pzW;
+    }
+
+    @Override
+    public void writeToBuffer(FloatBuffer buffer) {
+        buffer.put(this.nxX);
+        buffer.put(this.nxY);
+        buffer.put(this.nxZ);
+        buffer.put(this.nxW);
+        buffer.put(this.pxX);
+        buffer.put(this.pxY);
+        buffer.put(this.pxZ);
+        buffer.put(this.pxW);
+        buffer.put(this.nyX);
+        buffer.put(this.nyY);
+        buffer.put(this.nyZ);
+        buffer.put(this.nyW);
+        buffer.put(this.pyX);
+        buffer.put(this.pyY);
+        buffer.put(this.pyZ);
+        buffer.put(this.pyW);
+        buffer.put(this.nzX);
+        buffer.put(this.nzY);
+        buffer.put(this.nzZ);
+        buffer.put(this.nzW);
+        buffer.put(this.pzX);
+        buffer.put(this.pzY);
+        buffer.put(this.pzZ);
+        buffer.put(this.pzW);
     }
 }

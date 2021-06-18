@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class ChunkGraphCuller implements ChunkCuller {
+public class ChunkGraphNotCuller implements ChunkCuller {
     private final Long2ObjectMap<ChunkGraphNode> nodes = new Long2ObjectOpenHashMap<>();
 
     private final ChunkGraphIterationQueue visible = new ChunkGraphIterationQueue();
@@ -31,7 +31,7 @@ public class ChunkGraphCuller implements ChunkCuller {
 
     private int activeFrame = 0;
 
-    public ChunkGraphCuller(World world, int renderDistance) {
+    public ChunkGraphNotCuller(World world, int renderDistance) {
         this.world = world;
         this.renderDistance = renderDistance;
     }
@@ -125,10 +125,6 @@ public class ChunkGraphCuller implements ChunkCuller {
 
     private void bfsEnqueue(ChunkGraphNode parent, ChunkGraphNode node, Direction flow) {
         if (node.getLastVisibleFrame() == this.activeFrame) {
-            return;
-        }
-
-        if (node.isCulledByFrustum(this.frustum)) {
             return;
         }
 

@@ -1,6 +1,7 @@
 package me.jellysquid.mods.sodium.client.gl.arena;
 
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlBuffer;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferTarget;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferUsage;
@@ -8,17 +9,18 @@ import me.jellysquid.mods.sodium.client.gl.buffer.GlMutableBuffer;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 
-import java.util.Set;
-
+/**
+ * A wrapper over a resizable buffer, in which sub regions can be allocated and freed
+ */
 public class GlBufferArena {
     private static final GlBufferUsage BUFFER_USAGE = GlBufferUsage.GL_DYNAMIC_DRAW;
 
     private final RenderDevice device;
     private final int resizeIncrement;
 
-    private final Set<GlBufferSegment> freeRegions = new ObjectLinkedOpenHashSet<>();
+    private final Int2ObjectMap<GlBufferSegment> freeRegions = new Int2ObjectLinkedOpenHashMap<>();
 
-    private GlMutableBuffer vertexBuffer;
+    GlMutableBuffer internalBuffer;
 
     private int position;
     private int capacity;
@@ -28,8 +30,8 @@ public class GlBufferArena {
         this.device = device;
 
         try (CommandList commands = device.createCommandList()) {
-            this.vertexBuffer = commands.createMutableBuffer(BUFFER_USAGE);
-            commands.allocateBuffer(GlBufferTarget.COPY_WRITE_BUFFER, this.vertexBuffer, initialSize);
+            this.internalBuffer = commands.createMutableBuffer(BUFFER_USAGE);
+            commands.allocateBuffer(GlBufferTarget.COPY_WRITE_BUFFER, this.internalBuffer, initialSize);
         }
 
         this.resizeIncrement = resizeIncrement;
@@ -37,14 +39,14 @@ public class GlBufferArena {
     }
 
     private void resize(CommandList commandList, int newCapacity) {
-        GlMutableBuffer src = this.vertexBuffer;
+        GlMutableBuffer src = this.internalBuffer;
         GlMutableBuffer dst = commandList.createMutableBuffer(BUFFER_USAGE);
 
         commandList.allocateBuffer(GlBufferTarget.COPY_WRITE_BUFFER, dst, newCapacity);
         commandList.copyBufferSubData(src, dst, 0, 0, this.position);
         commandList.deleteBuffer(src);
 
-        this.vertexBuffer = dst;
+        this.internalBuffer = dst;
         this.capacity = newCapacity;
     }
 
@@ -54,26 +56,52 @@ public class GlBufferArena {
         }
     }
 
+    @Deprecated
     public GlBufferSegment uploadBuffer(CommandList commandList, GlBuffer readBuffer, int readOffset, int byteCount) {
         this.prepareBuffer(commandList, byteCount);
 
         GlBufferSegment segment = this.alloc(byteCount);
 
-        commandList.copyBufferSubData(readBuffer, this.vertexBuffer, readOffset, segment.getStart(), byteCount);
+        commandList.copyBufferSubData(readBuffer, this.internalBuffer, readOffset, segment.getStart(), byteCount);
 
         return segment;
     }
+
 
     private int getNextSize(int len) {
         return Math.max(this.capacity + this.resizeIncrement, this.capacity + len);
     }
 
-    public void free(GlBufferSegment segment) {
-        if (!this.freeRegions.add(segment)) {
-            throw new IllegalArgumentException("Segment already freed");
+
+    void free(GlBufferSegment segment) {
+        GlBufferSegment next = this.freeRegions.remove(segment.getStart() + segment.getLength());
+        if (next == null) {
+            this.freeRegions.put(segment.getStart(), segment);
+        } else {
+            // merge regions
+            this.freeRegions.put(
+                    segment.getStart(),
+                    new GlBufferSegment(this, segment.getStart(), segment.getLength() + next.getLength()));
         }
 
+
         this.allocCount--;
+    }
+
+    public GlBufferSegment alloc(CommandList commandList, int len) {
+        GlBufferSegment segment = this.allocReuse(len);
+
+        if (segment == null) {
+            this.prepareBuffer(commandList, len);
+
+            segment = new GlBufferSegment(this, this.position, len);
+
+            this.position += len;
+        }
+
+        this.allocCount++;
+
+        return segment;
     }
 
     private GlBufferSegment alloc(int len) {
@@ -93,7 +121,7 @@ public class GlBufferArena {
     private GlBufferSegment allocReuse(int len) {
         GlBufferSegment bestSegment = null;
 
-        for (GlBufferSegment segment : this.freeRegions) {
+        for (GlBufferSegment segment : this.freeRegions.values()) {
             if (segment.getLength() < len) {
                 continue;
             }
@@ -107,12 +135,14 @@ public class GlBufferArena {
             return null;
         }
 
-        this.freeRegions.remove(bestSegment);
+        this.freeRegions.remove(bestSegment.getStart());
 
         int excess = bestSegment.getLength() - len;
 
         if (excess > 0) {
-            this.freeRegions.add(new GlBufferSegment(this, bestSegment.getStart() + len, excess));
+            this.freeRegions.put(
+                    bestSegment.getStart() + len,
+                    new GlBufferSegment(this, bestSegment.getStart() + len, excess));
         }
 
         return new GlBufferSegment(this, bestSegment.getStart(), len);
@@ -120,7 +150,7 @@ public class GlBufferArena {
 
     public void delete() {
         try (CommandList commands = this.device.createCommandList()) {
-            commands.deleteBuffer(this.vertexBuffer);
+            commands.deleteBuffer(this.internalBuffer);
         }
     }
 
@@ -129,6 +159,6 @@ public class GlBufferArena {
     }
 
     public GlBuffer getBuffer() {
-        return this.vertexBuffer;
+        return this.internalBuffer;
     }
 }

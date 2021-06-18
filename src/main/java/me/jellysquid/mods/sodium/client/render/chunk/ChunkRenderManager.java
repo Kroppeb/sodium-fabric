@@ -31,12 +31,10 @@ import me.jellysquid.mods.sodium.common.util.IdTable;
 import me.jellysquid.mods.sodium.common.util.collections.FutureDequeDrain;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.chunk.ChunkOcclusionData;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Matrix4f;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.*;
 import net.minecraft.world.chunk.ChunkSection;
 
 import java.util.ArrayDeque;
@@ -345,6 +343,8 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
             }
 
             this.culler.onSectionUnloaded(x, y, z);
+
+            this.setVisibilityData(ChunkSectionPos.from(x,y,z), null);
         }
     }
 
@@ -385,13 +385,29 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
 
         if (ChunkSection.isEmpty(this.world.getChunk(x, z).getSectionArray()[this.world.sectionCoordToIndex(y)])) {
             render.setData(ChunkRenderData.EMPTY);
+            // visiblity data is already set to null if the data is empty
+            // TODO figure out why it still only "uploads" it in a diamond pattern
         } else {
             render.scheduleRebuild(false);
+
+            this.setVisibilityData(ChunkSectionPos.from(x,y,z), 0b111_111);
         }
 
         render.setId(this.renders.add(render));
 
         return render;
+    }
+
+    public void beforeRender(MatrixStack matrixStack, double x, double y, double z, SodiumWorldRenderer sodiumWorldRenderer, Matrix4f projectionMatrix) {
+        this.backend.beforeRender(matrixStack, x,y,z,sodiumWorldRenderer, this, projectionMatrix);
+    }
+
+    public void setVisibilityData(ChunkSectionPos sectionPos, ChunkOcclusionData occlusionData) {
+        this.backend.setVisibilityData(sectionPos, occlusionData);
+    }
+
+    public void setVisibilityData(ChunkSectionPos sectionPos, int occlusionData) {
+        this.backend.setVisibilityData(sectionPos, occlusionData);
     }
 
     public void renderLayer(MatrixStack matrixStack, BlockRenderPass pass, double x, double y, double z, Matrix4f projectionMatrix) {

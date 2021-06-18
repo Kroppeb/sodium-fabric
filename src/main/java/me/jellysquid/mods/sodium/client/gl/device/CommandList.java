@@ -7,6 +7,7 @@ import me.jellysquid.mods.sodium.client.gl.tessellation.GlTessellation;
 import me.jellysquid.mods.sodium.client.gl.tessellation.TessellationBinding;
 
 import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
 
 public interface CommandList extends AutoCloseable {
     GlVertexArray createVertexArray();
@@ -21,11 +22,29 @@ public interface CommandList extends AutoCloseable {
         this.uploadData(glBuffer, data.buffer);
     }
 
-    void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer);
+    default void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer){
+        this.uploadData(GlBufferTarget.ARRAY_BUFFER, glBuffer, byteBuffer);
+    }
+
+    default void uploadData(GlMutableBuffer glBuffer, ShortBuffer shortBuffer){
+        this.uploadData(GlBufferTarget.ARRAY_BUFFER, glBuffer, shortBuffer);
+    }
+
+    void uploadData(GlBufferTarget target, GlMutableBuffer glBuffer, ByteBuffer byteBuffer);
+
+    void uploadData(GlBufferTarget target, GlMutableBuffer glBuffer, ShortBuffer shortBuffer);
+
+    void uploadDataBase(GlBufferTarget target, int index, GlMutableBuffer glBuffer, ByteBuffer byteBuffer);
+
+    void createData(GlBufferTarget target, GlMutableBuffer buffer, int size);
+
+    void createDataBase(GlBufferTarget target, int index, GlMutableBuffer buffer, int size);
 
     void copyBufferSubData(GlBuffer src, GlMutableBuffer dst, long readOffset, long writeOffset, long bytes);
 
     void bindBuffer(GlBufferTarget target, GlBuffer buffer);
+
+    void bindBufferBase(GlBufferTarget target, int index, GlBuffer buffer);
 
     void unbindBuffer(GlBufferTarget target);
 
@@ -45,8 +64,12 @@ public interface CommandList extends AutoCloseable {
 
     void deleteTessellation(GlTessellation tessellation);
 
+    void dispatchCompute(int x, int y, int z);
+
     @Override
     default void close() {
         this.flush();
     }
+
+
 }

@@ -1,5 +1,8 @@
 package me.jellysquid.mods.sodium.client.gl.arena;
 
+import me.jellysquid.mods.sodium.client.gl.buffer.GlBuffer;
+import me.jellysquid.mods.sodium.client.gl.device.CommandList;
+
 public class GlBufferSegment {
     private final GlBufferArena arena;
     private final int start;
@@ -21,5 +24,14 @@ public class GlBufferSegment {
 
     public void delete() {
         this.arena.free(this);
+    }
+
+    @Deprecated
+    public void uploadBuffer(
+            CommandList commandList,
+            GlBuffer readBuffer,
+            int readOffset,
+            int byteCount) {
+        commandList.copyBufferSubData(readBuffer, this.arena.internalBuffer, readOffset, this.start, byteCount);
     }
 }

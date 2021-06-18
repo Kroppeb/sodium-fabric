@@ -36,11 +36,12 @@ public class ShaderConstants {
 
         }
 
-        public void define(String name) {
+        public Builder define(String name) {
             this.define(name, EMPTY_VALUE);
+            return this;
         }
 
-        public void define(String name, String value) {
+        public Builder define(String name, String value) {
             String prev = this.constants.get(name);
 
             if (prev != null) {
@@ -48,6 +49,7 @@ public class ShaderConstants {
             }
 
             this.constants.put(name, value);
+            return this;
         }
 
         public ShaderConstants build() {

@@ -10,6 +10,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Matrix4f;
+import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -76,6 +77,35 @@ public abstract class MixinWorldRenderer {
     @Inject(method = "scheduleTerrainUpdate", at = @At("RETURN"))
     private void onTerrainUpdateScheduled(CallbackInfo ci) {
         this.renderer.scheduleTerrainUpdate();
+    }
+
+    @Inject(method = "render", at = @At(
+            value = "INVOKE_STRING",
+            shift = At.Shift.AFTER,
+            target = "Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V",
+            args = {
+                    "ldc=terrain"
+            }
+    ))
+    private void preTerrainRendering(
+            MatrixStack matrixStack,
+            float tickDelta,
+            long limitTime,
+            boolean renderBlockOutline,
+            Camera camera,
+            GameRenderer gameRenderer,
+            LightmapTextureManager lightmapTextureManager,
+            Matrix4f projectionMatrix,
+            CallbackInfo ci) {
+
+        Vec3d pos = camera.getPos();
+        RenderDevice.enterManagedCode();
+
+        try {
+            this.renderer.beforeDraw(matrixStack, pos.x, pos.y, pos.z, projectionMatrix);
+        } finally {
+            RenderDevice.exitManagedCode();
+        }
     }
 
     /**

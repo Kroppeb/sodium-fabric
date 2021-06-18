@@ -13,4 +13,11 @@ public class ChunkShaderBindingPoints {
 
     // Fragment out
     public static final ShaderBindingPoint FRAG_COLOR = new ShaderBindingPoint(0);
+
+    // GPU culler
+    public static final ShaderBindingPoint INPUT_DATA = new ShaderBindingPoint(0);
+    public static final ShaderBindingPoint FIRST_COMMAND_LIST = new ShaderBindingPoint(1);
+    public static final ShaderBindingPoint SECOND_COMMAND_LIST = new ShaderBindingPoint(2);
+
+    public static final ShaderBindingPoint ATOMIC_COUNTERS = new ShaderBindingPoint(0);
 }

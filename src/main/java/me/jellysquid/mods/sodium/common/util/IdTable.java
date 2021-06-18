@@ -53,4 +53,8 @@ public class IdTable<T> {
     public void set(int id, T value) {
         this.elements[id] = value;
     }
+
+    public int count() {
+        return this.nextId - this.freeIds.size();
+    }
 }

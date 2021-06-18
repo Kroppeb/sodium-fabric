@@ -11,6 +11,7 @@ import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderManager;
+import me.jellysquid.mods.sodium.client.render.chunk.backends.gpuculled.GpuCulledRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.backends.multidraw.MultidrawChunkRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.backends.oneshot.ChunkRenderBackendOneshot;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
@@ -27,6 +28,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.block.entity.BlockEntityRenderDispatcher;
+import net.minecraft.client.render.chunk.ChunkOcclusionData;
 import net.minecraft.client.render.model.ModelLoader;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
@@ -215,6 +217,10 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         Entity.setRenderDistanceMultiplier(MathHelper.clamp((double) this.client.options.viewDistance / 8.0D, 1.0D, 2.5D) * (double) this.client.options.entityDistanceScaling);
     }
 
+    public void beforeDraw(MatrixStack matrixStack, double x, double y, double z, Matrix4f projectionMatrix) {
+        this.chunkRenderManager.beforeRender(matrixStack, x,y,z,this, projectionMatrix);
+    }
+
     /**
      * Performs a render pass for the given {@link RenderLayer} and draws all visible chunks for it.
      */
@@ -277,7 +283,7 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         boolean disableBlacklist = SodiumClientMod.options().advanced.disableDriverBlacklist;
 
         if (options.advanced.useMultidraw && MultidrawChunkRenderBackend.isSupported(disableBlacklist)) {
-            return new MultidrawChunkRenderBackend(device, vertexFormat);
+            return new GpuCulledRenderBackend(device, vertexFormat);
         } else {
             return new ChunkRenderBackendOneshot(vertexFormat);
         }
@@ -343,6 +349,11 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
     public void onChunkRenderUpdated(int x, int y, int z, ChunkRenderData meshBefore, ChunkRenderData meshAfter) {
         ListUtil.updateList(this.globalBlockEntities, meshBefore.getGlobalBlockEntities(), meshAfter.getGlobalBlockEntities());
 
+        if(meshAfter.isEmpty()){
+            this.chunkRenderManager.setVisibilityData(ChunkSectionPos.from(x,y,z), null);
+        }else{
+            this.chunkRenderManager.setVisibilityData(ChunkSectionPos.from(x,y,z), meshAfter.getOcclusionData());
+        }
         this.chunkRenderManager.onChunkRenderUpdates(x, y, z, meshAfter);
     }
 

@@ -15,10 +15,12 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL31C;
 import org.lwjgl.opengl.GL32C;
+import org.lwjgl.opengl.GL43C;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 
 public class GLRenderDevice implements RenderDevice {
     private final GlStateTracker stateTracker = new GlStateTracker();
@@ -75,13 +77,50 @@ public class GLRenderDevice implements RenderDevice {
             }
         }
 
-        @Override
-        public void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer) {
-            this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
 
-            GL20C.glBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, glBuffer.getUsageHint().getId());
+        @Override
+        public void uploadData(GlBufferTarget target, GlMutableBuffer glBuffer, ByteBuffer byteBuffer) {
+            this.bindBuffer(target, glBuffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), byteBuffer, glBuffer.getUsageHint().getId());
 
             glBuffer.setSize(byteBuffer.limit());
+        }
+
+        @Override
+        public void uploadData(GlBufferTarget target, GlMutableBuffer glBuffer, ShortBuffer shortBuffer) {
+            this.bindBuffer(target, glBuffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), shortBuffer, glBuffer.getUsageHint().getId());
+
+            glBuffer.setSize(shortBuffer.limit());
+        }
+
+        @Override
+        public void uploadDataBase(GlBufferTarget target, int index, GlMutableBuffer glBuffer, ByteBuffer byteBuffer) {
+            this.bindBufferBase(target, index, glBuffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), byteBuffer, glBuffer.getUsageHint().getId());
+
+            glBuffer.setSize(byteBuffer.limit());
+        }
+
+        @Override
+        public void createData(GlBufferTarget target, GlMutableBuffer glBuffer, int size) {
+            this.bindBuffer(target, glBuffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), size, glBuffer.getUsageHint().getId());
+
+            glBuffer.setSize(size);
+        }
+
+        @Override
+        public void createDataBase(GlBufferTarget target, int index, GlMutableBuffer glBuffer, int size) {
+            this.bindBufferBase(target, index, glBuffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), size, glBuffer.getUsageHint().getId());
+
+            glBuffer.setSize(size);
         }
 
         @Override
@@ -101,6 +140,13 @@ public class GLRenderDevice implements RenderDevice {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
                 GL20C.glBindBuffer(target.getTargetParameter(), buffer.handle());
             }
+        }
+
+        @Override
+        public void bindBufferBase(GlBufferTarget target, int index, GlBuffer buffer) {
+            // TODO: this shouldn't be needed I think?
+            this.bindBuffer(target, buffer);
+            GL32C.glBindBufferBase(target.getTargetParameter(), index, buffer.handle());
         }
 
         @Override
@@ -184,6 +230,11 @@ public class GLRenderDevice implements RenderDevice {
             } else {
                 return new GlFallbackTessellation(primitiveType, bindings);
             }
+        }
+
+        @Override
+        public void dispatchCompute(int x, int y, int z) {
+            GL43C.glDispatchCompute(x, y, z);
         }
     }
 
