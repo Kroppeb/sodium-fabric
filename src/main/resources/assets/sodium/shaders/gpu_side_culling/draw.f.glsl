@@ -4,7 +4,23 @@
 // #define secondPass
 // #define secondPass2
 // #define useColor
-// #define inlineAtomicCounter
+
+
+#ifdef __SODIUM__ATOMICS__USE_SSBO
+
+#define inlineAtomicCounter
+
+#else
+#ifdef __SODIUM__ATOMICS__USE_AC
+
+layout(binding = 0) uniform atomic_uint counter;
+
+#else
+
+#error No AtomicSystem has been selected
+
+#endif
+#endif
 
 #ifdef useColor
 out vec4 fragColor;
@@ -52,7 +68,6 @@ layout(binding = 3) writeonly restrict buffer drawCommandBuffer {
 flat in int chunkId;// TODO get chunkID
 #define chunkStatus chunkStatusList[chunkId]
 
-layout(binding = 0) uniform atomic_uint counter;
 
 #ifdef inlineAtomicCounter
 uint calculateOutputIndex(){
@@ -60,7 +75,7 @@ uint calculateOutputIndex(){
 }
     #else
 uint calculateOutputIndex(){
-    return TODO;
+    return atomicCounterIncrement(counter);
 }
     #endif
 

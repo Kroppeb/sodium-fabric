@@ -64,8 +64,17 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
     private final GlVertexArray drawChunkBoxPassVAO;
 
-    public GpuCulledRenderBackend(RenderDevice device, ChunkVertexType vertexType) {
+    private final AtomicSystem atomicSystem;
+    private final GlMutableBuffer atomicCounters;
+
+    public GpuCulledRenderBackend(
+            RenderDevice device,
+            ChunkVertexType vertexType,
+            AtomicSystem atomicSystem
+    ) {
         super(vertexType);
+
+        this.atomicSystem = atomicSystem;
 
         try (CommandList commandList = device.createCommandList()) {
             this.computeInputsBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_DRAW);
@@ -76,6 +85,9 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             this.firstPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
             this.secondPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
             this.thirdPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
+            this.atomicCounters = this.atomicSystem == AtomicSystem.SSBO
+                    ? null
+                    : commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
 
             this.drawChunkBoxPassVAO = commandList.createVertexArray();
 
@@ -95,7 +107,7 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             GL42C.glVertexAttribDivisor(1, 1);
             GL32C.glEnableVertexAttribArray(1);
 
-            GL32C.glVertexAttribPointer(2, 1, GL32C.GL_INT, false,  16, 12);
+            GL32C.glVertexAttribPointer(2, 1, GL32C.GL_INT, false, 16, 12);
             GL42C.glVertexAttribDivisor(2, 1);
             GL32C.glEnableVertexAttribArray(2);
 
@@ -159,11 +171,20 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
     }
 
+    private ShaderConstants.Builder getConstantBuilder() {
+        ShaderConstants.Builder builder = ShaderConstants.builder();
+
+        // apply default defines
+        this.atomicSystem.getDefines().forEach(builder::define);
+
+        return builder;
+    }
+
     private Program createComputeProgram(RenderDevice device) {
         var computeShader = ShaderLoader.loadShader(device, ShaderType.COMPUTE,
-                new Identifier("sodium", "gpu_side_culling/generate_commands.c.glsl"), ShaderConstants.builder()
+                new Identifier("sodium", "gpu_side_culling/generate_commands.c.glsl"),
+                this.getConstantBuilder()
                         // .define("useTriangleStrip")
-                        // .define("useAtomicCounter")
                         // .define("useMultiAtomicCounter")
                         // .define("useNoBranchFrustumCheck")
                         .build());
@@ -179,11 +200,13 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
     private Program createFirstPassProgram(RenderDevice device) {
         var vertexShader = ShaderLoader.loadShader(device, ShaderType.VERTEX,
-                new Identifier("sodium", "gpu_side_culling/draw.v.glsl"), ShaderConstants.builder()
+                new Identifier("sodium", "gpu_side_culling/draw.v.glsl"),
+                this.getConstantBuilder()
                         //.define("useColor")
                         .build());
         var fragmentShader = ShaderLoader.loadShader(device, ShaderType.FRAGMENT,
-                new Identifier("sodium", "gpu_side_culling/draw.f.glsl"), ShaderConstants.builder()
+                new Identifier("sodium", "gpu_side_culling/draw.f.glsl"),
+                this.getConstantBuilder()
                         //.define("useColor")
                         .build());
         try {
@@ -199,12 +222,14 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
     private Program createSecondPassProgram(RenderDevice device) {
         var vertexShader = ShaderLoader.loadShader(device, ShaderType.VERTEX,
-                new Identifier("sodium", "gpu_side_culling/draw.v.glsl"), ShaderConstants.builder()
+                new Identifier("sodium", "gpu_side_culling/draw.v.glsl"),
+                this.getConstantBuilder()
                         .define("useColor")
                         .define("secondPass")
                         .build());
         var fragmentShader = ShaderLoader.loadShader(device, ShaderType.FRAGMENT,
-                new Identifier("sodium", "gpu_side_culling/draw.f.glsl"), ShaderConstants.builder()
+                new Identifier("sodium", "gpu_side_culling/draw.f.glsl"),
+                this.getConstantBuilder()
                         //.define("supportsEarlyFragmentTests")
                         .define("secondPass")
                         .define("secondPass2")
@@ -350,6 +375,7 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             commandList.bindBuffer(GlBufferTarget.DRAW_INDIRECT_BUFFER, this.secondPassCommandBuffer);
 
             this.secondPassProgram.bind();
+            commandList.createDataBase(GlBufferTarget.ATOMIC_COUNTER_BUFFERS, 0, this.atomicCounters, 1);
 
             // update uniforms
             try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -376,8 +402,7 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
             // endregion step 3
 
-            // disable depth test
-            GL32C.glDisable(GL32C.GL_DEPTH_TEST);
+
         }
     }
 

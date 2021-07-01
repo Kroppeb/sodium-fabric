@@ -244,7 +244,7 @@ public class GpuCullingChunkManager {
                 GlBufferSegment glBufferSegment = this.meshDataLocation.get(chunkSectionPos);
                 if(glBufferSegment != null){
                     fragmentInputs.putInt(1);
-                    fragmentInputs.putInt(glBufferSegment.getLength() / ); // TODO get count
+                    fragmentInputs.putInt(glBufferSegment.getLength() / 20/* HELP? */); // TODO get count
                     fragmentInputs.putInt(chunkSectionPos.getY() * 16 + 8); // TODO get firstIndex
                     fragmentInputs.putInt(chunkSectionPos.getZ() * 16 + 8); // TODO get baseInstance
                 } else {

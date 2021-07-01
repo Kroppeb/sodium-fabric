@@ -4,9 +4,23 @@
 
 // #define useTriangleStrip
 // #define doubleSided
+
 // #define useAtomicCounter
 // #define useMultiAtomicCounter
 // #define useNoBranchFrustumCheck
+
+#ifdef __SODIUM__ATOMICS__USE_SSBO
+#else
+#ifdef __SODIUM__ATOMICS__USE_AC
+
+//#define useAtomicCounter
+
+#else
+
+#error No AtomicSystem has been selected
+
+#endif
+#endif
 
 
 #define multiAtomicCounterSize (8) /* minimum value for GL_MAX_COMPUTE_ATOMIC_COUNTERS */
@@ -32,13 +46,12 @@
 
 /* interal fancy stuff */
 
-#define getIndices uint inputIndex = calculateInputIndex(); uint outputIndex = calculateOutputIndex();
 #define inputData inputs[inputIndex]
 #define firstCommand firstPassCommands[outputIndex]
 #define secondCommand secondPassCommands[outputIndex]
 
 uniform vec4[6] frustum;
-uniform vec3 camaraPos; // could be applied to the frustum in cpu land
+uniform vec3 camaraPos;// could be applied to the frustum in cpu land
 
 layout(local_size_x = 1) in;
 
@@ -107,7 +120,7 @@ uint calculateOutputIndex(){
     #endif
 
 
-#ifdef useNoBranchFrustumCheck
+    #ifdef useNoBranchFrustumCheck
 uint insideFrustum(vec3 pos) {
     uint f0 = min(uint(dot(frustum[0], vec4(pos, 1)) * oneOverMargin), 1);
     uint f1 = min(uint(dot(frustum[1], vec4(pos, 1)) * oneOverMargin), 1);
@@ -117,7 +130,7 @@ uint insideFrustum(vec3 pos) {
     uint f5 = min(uint(dot(frustum[5], vec4(pos, 1)) * oneOverMargin), 1);
     return f0 * f1 * f2 * f3 * f4 * f5;
 }
-#else
+    #else
 uint insideFrustum(vec3 pos){
     if (dot(frustum[0], vec4(pos, 1)) <= margin) return 0;
     if (dot(frustum[1], vec4(pos, 1)) <= margin) return 0;
@@ -127,11 +140,11 @@ uint insideFrustum(vec3 pos){
     if (dot(frustum[5], vec4(pos, 1)) <= margin) return 0;
     return 1;
 }
-#endif
+    #endif
 
 void main()
 {
-    getIndices;
+    uint inputIndex = calculateInputIndex();
 
     uint count = inputData.count;
     uint firstIndex = inputData.firstIndex;
@@ -141,6 +154,8 @@ void main()
     uint visible = insideFrustum(pos - camaraPos);
 
     pushStart
+
+uint outputIndex = calculateOutputIndex();
 
 firstCommand.count = count;
 firstCommand.instanceCount = getInstanceCount;

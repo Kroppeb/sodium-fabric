@@ -11,6 +11,7 @@ import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderManager;
+import me.jellysquid.mods.sodium.client.render.chunk.backends.gpuculled.AtomicSystem;
 import me.jellysquid.mods.sodium.client.render.chunk.backends.gpuculled.GpuCulledRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.backends.multidraw.MultidrawChunkRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.backends.oneshot.ChunkRenderBackendOneshot;
@@ -283,7 +284,7 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         boolean disableBlacklist = SodiumClientMod.options().advanced.disableDriverBlacklist;
 
         if (options.advanced.useMultidraw && MultidrawChunkRenderBackend.isSupported(disableBlacklist)) {
-            return new GpuCulledRenderBackend(device, vertexFormat);
+            return new GpuCulledRenderBackend(device, vertexFormat, AtomicSystem.AC);
         } else {
             return new ChunkRenderBackendOneshot(vertexFormat);
         }
