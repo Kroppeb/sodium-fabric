@@ -38,12 +38,8 @@ layout(early_fragment_tests) in;
 #define FLAG_DRAWN 2
 
 struct ChunkStatus {
-// 0b0000_0001: in memory
-// 0b0000_0010: drawn this frame
     int status;
-    uint count;
-    uint firstIndex;
-    uint baseInstance;
+    vec3 chunkPos;
 };
 
 layout(binding = 4) restrict buffer inputDataBuffer {
@@ -65,7 +61,7 @@ layout(binding = 3) writeonly restrict buffer drawCommandBuffer {
     DrawElementsIndirectCommand[] drawCommands;
 };
 
-flat in int chunkId;// TODO get chunkID
+flat in int chunkId;
 #define chunkStatus chunkStatusList[chunkId]
 
 
@@ -89,24 +85,15 @@ uint calculateOutputIndex(){
 
 void main() {
     #ifdef useColor
-    #ifdef secondPass2
-    fragColor = color / 2;
+    #ifndef secondPass2
+    fragColor = vec4(mod(vec3(.9852 * chunkId, .35496 * chunkId, .1265 * chunkId), 1.0), 1.0);
     #else
     fragColor = color;
     #endif
     #endif
 
     #ifdef secondPass
-    int oldStatus  = atomicOr(chunkStatus.status, FLAG_DRAWN);
-    if ((oldStatus & (FLAG_IN_MEMORY | FLAG_DRAWN)) == FLAG_IN_MEMORY){
-        uint drawIndex = calculateOutputIndex();
-
-        drawCommand.count = chunkStatus.count;
-        drawCommand.instanceCount = 1;
-        drawCommand.firstIndex = chunkStatus.firstIndex;
-        drawCommand.baseVertex = 0;
-        drawCommand.baseInstance = chunkStatus.baseInstance;
-    }
-        #endif
+    atomicOr(chunkStatus.status, 1);
+    #endif
 }
 

@@ -86,6 +86,11 @@ public class ChunkRenderList<T> {
                 public void advance() {
                     this.pos--;
                 }
+
+                @Override
+                public int totalCount() {
+                    return ChunkRenderList.this.size;
+                }
             };
         } else {
             return new ChunkRenderListIterator<T>() {
@@ -111,6 +116,11 @@ public class ChunkRenderList<T> {
                 @Override
                 public void advance() {
                     this.pos++;
+                }
+
+                @Override
+                public int totalCount() {
+                    return ChunkRenderList.this.size;
                 }
             };
         }

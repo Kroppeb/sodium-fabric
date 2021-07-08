@@ -141,6 +141,7 @@ public class GpuCullingChunkManager {
                     GlBufferSegment segment = this.arena.uploadBuffer(commandList, this.uploadBuffer, 0, upload.buffer.capacity());
 
 
+                    this.meshDataLocation.put(renderContainer.getChunkPos(), segment);
                     state = new GpuCulledChunkGraphicsState(
                             renderContainer,
                             segment,
@@ -206,9 +207,9 @@ public class GpuCullingChunkManager {
         try (MemoryStack stack = memoryStack.push()) {
             ByteBuffer computeInputs = stack.malloc(this.occlusionData.size() * 32);
             ByteBuffer attributes = stack.malloc(this.occlusionData.size() * 4 * 4);
-            ByteBuffer fragmentInputs = stack.malloc(4 + this.occlusionData.size() * 4 * 4);
+            ByteBuffer fragmentInputs = stack.malloc(/*4*/ + this.occlusionData.size() * 4 * 4);
 
-            fragmentInputs.putInt(0); // initialise index with 0
+            /*fragmentInputs.putInt(0); // initialise index with 0*/
 
             int index = 0;
 
@@ -239,7 +240,7 @@ public class GpuCullingChunkManager {
                 attributes.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
                 attributes.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
                 attributes.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
-                attributes.putInt(index);
+                attributes.putInt(index); //
 
                 GlBufferSegment glBufferSegment = this.meshDataLocation.get(chunkSectionPos);
                 if(glBufferSegment != null){

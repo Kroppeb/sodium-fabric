@@ -29,6 +29,7 @@ import net.minecraft.util.Util;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Matrix4f;
+import net.minecraft.util.profiler.Profiler;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL32C;
 import org.lwjgl.opengl.GL42C;
@@ -44,9 +45,14 @@ import java.util.regex.Pattern;
 
 
 public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledChunkGraphicsState> {
-    private final Program generateCommandsProgram;
+
+    // Preprocess programs
+    private final Program generatePreCommandsProgram;
     private final Program firstPassProgram;
     private final Program secondPassProgram;
+
+    // draw programs
+    private final Program generatePassCommandsProgram;
 
 
     private final GlMutableBuffer computeInputsBuffer;
@@ -77,6 +83,9 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
         this.atomicSystem = atomicSystem;
 
         try (CommandList commandList = device.createCommandList()) {
+
+            // create all the buffers
+            // TODO: switch to buffer storage
             this.computeInputsBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_DRAW);
             this.fragmentInputsBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_DRAW);
             this.attributesBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_DRAW);
@@ -87,7 +96,7 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             this.thirdPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
             this.atomicCounters = this.atomicSystem == AtomicSystem.SSBO
                     ? null
-                    : commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
+                    : commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_READ);
 
             this.drawChunkBoxPassVAO = commandList.createVertexArray();
 
@@ -114,9 +123,14 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             commandList.unbindVertexArray();
         }
 
-        this.generateCommandsProgram = this.createComputeProgram(device);
+        // create pre render programs
+        this.generatePreCommandsProgram = this.createPreComputeProgram(device);
         this.firstPassProgram = this.createFirstPassProgram(device);
         this.secondPassProgram = this.createSecondPassProgram(device);
+
+        // create pass programs
+        this.generatePassCommandsProgram = this.createPassComputeProgram(device);
+
         int renderDistance = 2 * MinecraftClient.getInstance().options.viewDistance + 1;
         int height = 16; // can't get the exact value here I think. This is only for the initial size anyway
 
@@ -180,9 +194,9 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
         return builder;
     }
 
-    private Program createComputeProgram(RenderDevice device) {
+    private Program createPreComputeProgram(RenderDevice device) {
         var computeShader = ShaderLoader.loadShader(device, ShaderType.COMPUTE,
-                new Identifier("sodium", "gpu_side_culling/generate_commands.c.glsl"),
+                new Identifier("sodium", "gpu_side_culling/generate_pre_commands.c.glsl"),
                 this.getConstantBuilder()
                         // .define("useTriangleStrip")
                         // .define("useMultiAtomicCounter")
@@ -190,7 +204,21 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
                         .build());
         System.out.println(computeShader.handle());
         try {
-            return GlProgram.builder(new Identifier("sodium", "gpu_side_culling/generate_commands.c"))
+            return GlProgram.builder(new Identifier("sodium", "gpu_side_culling/generate_pre_commands.c"))
+                    .attachShader(computeShader)
+                    .build((program, name) -> new Program(device, program, name));
+        } finally {
+            computeShader.delete();
+        }
+    }
+
+    private Program createPassComputeProgram(RenderDevice device) {
+        var computeShader = ShaderLoader.loadShader(device, ShaderType.COMPUTE,
+                new Identifier("sodium", "gpu_side_culling/generate_pass_commands.c.glsl"),
+                this.getConstantBuilder().build());
+        System.out.println(computeShader.handle());
+        try {
+            return GlProgram.builder(new Identifier("sodium", "gpu_side_culling/generate_pass_commands.c"))
                     .attachShader(computeShader)
                     .build((program, name) -> new Program(device, program, name));
         } finally {
@@ -234,7 +262,6 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
                         .define("secondPass")
                         .define("secondPass2")
                         .define("useColor")
-                        .define("inlineAtomicCounter")
                         .build());
         try {
             return GlProgram.builder(new Identifier("sodium", "gpu_side_culling/draw.v"))
@@ -282,36 +309,52 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
     @Override
     public void beforeRender(MatrixStack matrixStack, double x, double y, double z, SodiumWorldRenderer sodiumWorldRenderer, ChunkRenderManager<GpuCulledChunkGraphicsState> gpuCulledChunkGraphicsStateChunkRenderManager, Matrix4f projectionMatrix) {
+        Profiler profiler = sodiumWorldRenderer.getWorld().getProfiler();
         /*
-         *  1. create compute inputs
-         *  2. run the compute shader to generate the command buffers
+         *  # Pre draw passes
+         *
+         *  0. initialize buffers
+         *  1. run the compute shader to generate the command buffers
          *      // TODO is this actually better than generating them on the cpu?
-         *  3. run first draw commands with just a depth buffer
-         *  4. run second draw commands with without drawing
-         *      4.1 create/update a bitmap to mark which chunks are visible
-         *  5. create actual draw commands by running over the previous draw commands/third buffer
-         *      * by setting invisible chunks to visibility 0
-         *      * by creating a new buffer where only the visible, non-empty ones are added
-         *  6. draw using third command buffer
-         *  7. on cpu: dispatch build tasks based on the bitmap
+         *
+         *  2. run first draw commands with just a depth buffer
+         *  3. run second draw commands with without drawing
+         *      3.1 update a status to mark which chunks are visible
+         *
+         *  # For each draw pass
+         *
+         *  4. create actual draw commands by running over the status buffer
+         *      by creating a new buffer where only the visible, non-empty ones are added
+         *  5. draw using third command buffer
+         *
+         *  # Post draw pass?
+         *  6. on cpu: dispatch build tasks based on the status map
          */
 
 
         // TODO get frustum
 
+        profiler.push("GpuCullingBackend");
+
         try (var commandList = RenderDevice.INSTANCE.createCommandList()) {
 
-            // region step 1
+
+            profiler.push("step 0");
+
+            // region step 0
             int i = this.chunks.generateInputBuffer(commandList, this.computeInputsBuffer, this.attributesBuffer, this.fragmentInputsBuffer);
 
             commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 1, this.firstPassCommandBuffer, i * 20);
             commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 2, this.secondPassCommandBuffer, i * 20);
             commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 3, this.thirdPassCommandBuffer, i * 20);
 
-            this.generateCommandsProgram.bind();
+            // endregion step 0
+            profiler.swap("step 1");
 
-            // update frustum
+            // region step 1
+            this.generatePreCommandsProgram.bind();
 
+            // update frustum and cameraPos uniform
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 FloatBuffer floatBuffer = stack.mallocFloat(4 * 6);
 
@@ -319,21 +362,22 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
                 frustum.writeToBuffer(floatBuffer);
                 floatBuffer.rewind();
 
-                GL32C.glUniform4fv(this.generateCommandsProgram.uFrustum, floatBuffer);
-                GL32C.glUniform3f(this.generateCommandsProgram.uCamaraPos, (float) x, (float) y, (float) z);
+                GL32C.glUniform4fv(this.generatePreCommandsProgram.uFrustum, floatBuffer);
+                GL32C.glUniform3f(this.generatePreCommandsProgram.uCamaraPos, (float) x, (float) y, (float) z);
             }
 
 
             commandList.dispatchCompute(i, 1, 1);
 
             // endregion part 1
+            profiler.swap("part 2");
 
             // region part 2
 
             // enable depth testing and clear depth values
             GL32C.glEnable(GL32C.GL_DEPTH_TEST);
             GL32C.glClear(GL32C.GL_DEPTH_BUFFER_BIT);
-            GL32C.glDepthFunc(GL32C.GL_LEQUAL); // default is LESS i think
+            GL32C.glDepthFunc(GL32C.GL_LEQUAL); // default is GL_LESS I think
 
 
             commandList.bindVertexArray(this.drawChunkBoxPassVAO);
@@ -364,9 +408,9 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             );
 
             // endregion step 2
+            profiler.swap("part 3");
 
             // region part 3
-
 
             // disable drawing to the depth buffer
             GL32C.glDepthMask(false);
@@ -375,7 +419,6 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             commandList.bindBuffer(GlBufferTarget.DRAW_INDIRECT_BUFFER, this.secondPassCommandBuffer);
 
             this.secondPassProgram.bind();
-            commandList.createDataBase(GlBufferTarget.ATOMIC_COUNTER_BUFFERS, 0, this.atomicCounters, 1);
 
             // update uniforms
             try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -389,7 +432,10 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
                 GL20C.glUniformMatrix4fv(this.secondPassProgram.uModelViewProjectionMatrix, false, projectionBuffer);
                 GL32C.glUniform3f(this.secondPassProgram.uCamaraPos, (float) x, (float) y, (float) z);
+                commandList.uploadDataBase(
+                        GlBufferTarget.ATOMIC_COUNTER_BUFFERS, 0, this.atomicCounters, stack.calloc(4));
             }
+
 
             // dispatch call
             GlFunctions.INDIRECT_DRAW.glMultiDrawElementArraysIndirect(
@@ -401,14 +447,13 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             );
 
             // endregion step 3
-
-
+            profiler.pop();
         }
+        profiler.pop();
     }
 
     @Override
     public void render(CommandList commandList, ChunkRenderListIterator<GpuCulledChunkGraphicsState> renders, ChunkCameraContext camera) {
-
 
     }
 
@@ -418,7 +463,7 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
         super.delete();
 
         this.chunks.deleteResources();
-        this.generateCommandsProgram.delete();
+        this.generatePreCommandsProgram.delete();
     }
 
     @Override

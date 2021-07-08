@@ -1,4 +1,4 @@
-#version 430
+#version 460
 
 // #define secondPass
 // #define useColor
@@ -6,7 +6,7 @@
 layout(location = 0) in vec3 a_Pos;// The position of the vertex
 
 // The model translation for this draw call.
-layout(location = 1) in vec3 d_ModelOffset;
+layout(location = 1) in vec4 d_ModelOffset;
 
 #ifdef secondPass
 layout(location = 2) in int in_chunkId;
@@ -37,7 +37,7 @@ void main() {
     #endif
 
     #ifdef secondPass
-    chunkId = in_chunkId;
+    chunkId = gl_DrawID;//int(d_ModelOffset.w);//in_chunkId;
     #endif
 }
 

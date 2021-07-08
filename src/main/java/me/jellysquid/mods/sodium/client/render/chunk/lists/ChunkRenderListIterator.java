@@ -6,4 +6,5 @@ public interface ChunkRenderListIterator<T> {
 
     boolean hasNext();
     void advance();
+    int totalCount();
 }
