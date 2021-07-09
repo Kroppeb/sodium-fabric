@@ -38,16 +38,25 @@ struct ChunkMeshPass{
     MeshInfo unassigned;
 };
 
-layout(binding = 0) readonly restrict buffer chunkStatusBuffer {
-    ChunkStatus[] chunkStatusBuffer;
+struct Input {
+    uint count;
+    uint firstIndex;
+    int drawn;
+    vec3 pos;
 };
 
-layout(binding = 1) readonly restrict buffer meshInfoBuffer {
-    ChunkMeshPass[] meshInfoBuffer;
+layout(binding = 0) readonly restrict buffer inputDataBuffer {
+    Input[] inputs;
 };
 
-layout(binding = 2) writeonly restrict buffer DEICBuffer{
+// we can reuse the buffer from pass 1 or 2
+layout(binding = 1) writeonly restrict buffer DEICBufferBuffer{
     DrawElementsIndirectCommand[] DEICBuffer;
+};
+
+
+layout(binding = 3) readonly restrict buffer meshInfoBufferBuffer {
+    ChunkMeshPass[] meshInfoBuffer;
 };
 
 
@@ -70,10 +79,10 @@ void addCall(MeshInfo info){
 void main()
 {
     ChunkMeshPass pass = meshInfoBuffer[gl_GlobalInvocationID.x];
-    ChunkStatus status = chunkStatusBuffer[pass.chunkId];
+    Input status = inputs[pass.chunkId];
     ChunkBounds bounds = pass.bounds;
 
-    if (status.status == 0) return;
+    if (status.drawn == 0) return;
     if (pass.unassigned.size > 0){
         addCall(pass.unassigned);
     }

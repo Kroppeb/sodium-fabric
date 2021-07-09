@@ -65,7 +65,7 @@ public class ChunkRenderBackendOneshot extends ChunkRenderShaderBackend<ChunkOne
     }
 
     @Override
-    public void render(CommandList commandList, ChunkRenderListIterator<ChunkOneshotGraphicsState> it, ChunkCameraContext camera) {
+    public void render(CommandList commandList, ChunkRenderListIterator<ChunkOneshotGraphicsState> it, ChunkCameraContext camera, BlockRenderPass pass) {
         while (it.hasNext()) {
             ChunkOneshotGraphicsState state = it.getGraphicsState();
             int visibleFaces = it.getVisibleFaces();

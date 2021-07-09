@@ -1,6 +1,8 @@
 package me.jellysquid.mods.sodium.client.render.chunk.backends.gpuculled;
 
-import it.unimi.dsi.fastutil.objects.*;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferSegment;
 import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexFormat;
@@ -16,17 +18,23 @@ import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkMeshData;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
+import me.jellysquid.mods.sodium.client.struct.Structured;
 import net.minecraft.client.render.chunk.ChunkOcclusionData;
 import net.minecraft.util.math.ChunkSectionPos;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.ByteBuffer;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
+
+import static me.jellysquid.mods.sodium.client.struct.Structs.*;
 
 
 public class GpuCullingChunkManager {
     // you need approx 4 MB for all chunks in a 32 renderdistance (if none are empty)
-    private static final MemoryStack memoryStack = MemoryStack.create(64 * 1024 * 1024);
+    static final MemoryStack memoryStack = MemoryStack.create(64 * 1024 * 1024);
 
     private static final int EXPECTED_CHUNK_SIZE = 4 * 1024;
 
@@ -37,10 +45,20 @@ public class GpuCullingChunkManager {
 
     private final ObjectArrayList<ChunkBuildResult<GpuCulledChunkGraphicsState>> uploadQueue;
     private final Object2IntMap<ChunkSectionPos> occlusionData;
-    private final Object2ObjectMap<ChunkSectionPos, GlBufferSegment> meshDataLocation;
+    private final EnumMap<
+            BlockRenderPass,
+            Map<
+                    ChunkSectionPos,
+                    PassChunkDataHolder>> meshDataLocation;
 
 //    private GlTessellation tessellation;
 
+
+    private static record PassChunkDataHolder(
+            GlBufferSegment segment,
+            ChunkMeshData chunkMeshData
+    ) {
+    }
 
     private final GlMutableBuffer uploadBuffer;
 
@@ -51,7 +69,11 @@ public class GpuCullingChunkManager {
         this.arena = new GlBufferArena(device, arenaSize, arenaSize);
         this.uploadQueue = new ObjectArrayList<>();
         this.occlusionData = new Object2IntOpenHashMap<>(size);
-        this.meshDataLocation = new Object2ObjectOpenHashMap<>(size);
+        this.meshDataLocation = new EnumMap<>(BlockRenderPass.class);
+
+        for (var pass : BlockRenderPass.VALUES) {
+            this.meshDataLocation.put(pass, new HashMap<>(size));
+        }
 
         this.batch = ChunkDrawCallBatcher.create(size * ModelQuadFacing.COUNT);
 
@@ -124,6 +146,8 @@ public class GpuCullingChunkManager {
             for (BlockRenderPass pass : BlockRenderPass.VALUES) {
                 var graphicsState = renderContainer.getGraphicsState(pass);
 
+                var meshMap = this.meshDataLocation.get(pass);
+
                 // De-allocate the existing buffer arena for this render
                 // This will allow it to be cheaply re-allocated just below
                 if (graphicsState != null) {
@@ -141,7 +165,10 @@ public class GpuCullingChunkManager {
                     GlBufferSegment segment = this.arena.uploadBuffer(commandList, this.uploadBuffer, 0, upload.buffer.capacity());
 
 
-                    this.meshDataLocation.put(renderContainer.getChunkPos(), segment);
+                    meshMap.put(renderContainer.getChunkPos(), new PassChunkDataHolder(
+                            segment,
+                            meshData
+                    ));
                     state = new GpuCulledChunkGraphicsState(
                             renderContainer,
                             segment,
@@ -149,6 +176,14 @@ public class GpuCullingChunkManager {
                             vertexFormat,
                             GpuCulledChunkGraphicsState.readOcclusionData(data.getOcclusionData())
                     );
+                } else {
+                    // TODO better check all memory leaks
+                    PassChunkDataHolder old = meshMap.remove(renderContainer.getChunkPos());
+                    this.occlusionData.removeInt(renderContainer.getChunkPos());
+
+                    if (old != null) {
+                        old.segment().delete();
+                    }
                 }
                 renderContainer.setGraphicsState(pass, state);
             }
@@ -197,21 +232,19 @@ public class GpuCullingChunkManager {
 
     public int generateInputBuffer(
             CommandList commandList,
-            GlMutableBuffer computeInputsBuffer,
-            GlMutableBuffer attributesBuffer,
-            GlMutableBuffer fragmentInputsBuffer) {
+            @Structured(PreComputeInputs) GlMutableBuffer computeInputsBuffer,
+            @Structured(Vec3) GlMutableBuffer attributesBuffer,
+            @Structured(Int) GlMutableBuffer fragmentInputsBuffer) {
         System.out.println("occlusion data: " + this.occlusionData.size());
         System.out.println("gpu buffer size: " + ((GlMutableBuffer) this.arena.getBuffer()).getSize());
 
         // using our own stack to avoid out of memory caused by memory leak
         try (MemoryStack stack = memoryStack.push()) {
-            ByteBuffer computeInputs = stack.malloc(this.occlusionData.size() * 32);
-            ByteBuffer attributes = stack.malloc(this.occlusionData.size() * 4 * 4);
-            ByteBuffer fragmentInputs = stack.malloc(/*4*/ + this.occlusionData.size() * 4 * 4);
+            @Structured(PreComputeInputs) ByteBuffer preComputeInputs = stack.malloc(this.occlusionData.size() * PreComputeInputs.size);
+                    @Structured(Vec3) ByteBuffer chunkPositions = stack.malloc(this.occlusionData.size() * Vec3.size);
+            @Structured(Int) ByteBuffer chunkStatus = stack.malloc(this.occlusionData.size() * Int.size);
 
             /*fragmentInputs.putInt(0); // initialise index with 0*/
-
-            int index = 0;
 
             for (Object2IntMap.Entry<ChunkSectionPos> entry : this.occlusionData.object2IntEntrySet()) {
                 /*
@@ -226,51 +259,37 @@ public class GpuCullingChunkManager {
                 int occlusionData = entry.getIntValue();
                 ChunkSectionPos chunkSectionPos = entry.getKey();
 
-                computeInputs.putInt(ChunkCubeLookup.lookupCount(occlusionData));
-                computeInputs.putInt(ChunkCubeLookup.lookupStart(occlusionData));
-                computeInputs.putInt(index);
+                preComputeInputs.putInt(ChunkCubeLookup.lookupCount(occlusionData));
+                preComputeInputs.putInt(ChunkCubeLookup.lookupStart(occlusionData));
+                preComputeInputs.putInt(0); // drawn state
+                preComputeInputs.putInt(0); // align to 16
 
-                computeInputs.putInt(0);// vec3 needs 4 "floats" in ssbo
-                computeInputs.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
-                computeInputs.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
-                computeInputs.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
+                preComputeInputs.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
+                preComputeInputs.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
+                preComputeInputs.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
+                preComputeInputs.putInt(0); // vec3 needs 4 "floats"
 
-                computeInputs.putInt(0); // idk the stride is 32
+                chunkPositions.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
+                chunkPositions.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
+                chunkPositions.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
+                chunkPositions.putInt(0); // vec3 needs 4 "floats"
 
-                attributes.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
-                attributes.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
-                attributes.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
-                attributes.putInt(index); //
+                chunkStatus.putInt(0);
 
-                GlBufferSegment glBufferSegment = this.meshDataLocation.get(chunkSectionPos);
-                if(glBufferSegment != null){
-                    fragmentInputs.putInt(1);
-                    fragmentInputs.putInt(glBufferSegment.getLength() / 20/* HELP? */); // TODO get count
-                    fragmentInputs.putInt(chunkSectionPos.getY() * 16 + 8); // TODO get firstIndex
-                    fragmentInputs.putInt(chunkSectionPos.getZ() * 16 + 8); // TODO get baseInstance
-                } else {
-                    fragmentInputs.putInt(0);
-                    fragmentInputs.putInt(0);
-                    fragmentInputs.putInt(0);
-                    fragmentInputs.putInt(0);
-                }
-
-
-                index++;
             }
 
-            computeInputs.rewind();
-            attributes.rewind();
-            fragmentInputs.rewind();
+            preComputeInputs.rewind();
+            chunkPositions.rewind();
+            chunkStatus.rewind();
 
-            commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 0, computeInputsBuffer, computeInputs);
-            commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 4, fragmentInputsBuffer, fragmentInputs);
+            commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 0, computeInputsBuffer, preComputeInputs);
+            // commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 4, fragmentInputsBuffer, chunkStatus);
             // commandList.uploadDataBase(GlBufferTarget., 0, computeInputsBuffer, inputs);
 
 
-            commandList.uploadData(GlBufferTarget.ARRAY_BUFFER, attributesBuffer, attributes);
+            commandList.uploadData(GlBufferTarget.ARRAY_BUFFER, attributesBuffer, chunkPositions);
             commandList.unbindBuffer(GlBufferTarget.ARRAY_BUFFER);
-            return index;
+            return this.occlusionData.size();
         }
     }
 

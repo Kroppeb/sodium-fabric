@@ -5,25 +5,8 @@
 // #define useTriangleStrip
 // #define doubleSided
 
-// #define useAtomicCounter
-// #define useMultiAtomicCounter
 // #define useNoBranchFrustumCheck
 
-#ifdef __SODIUM__ATOMICS__USE_SSBO
-#else
-#ifdef __SODIUM__ATOMICS__USE_AC
-
-//#define useAtomicCounter
-
-#else
-
-#error No AtomicSystem has been selected
-
-#endif
-#endif
-
-
-#define multiAtomicCounterSize (8) /* minimum value for GL_MAX_COMPUTE_ATOMIC_COUNTERS */
 
 /* internal calculations */
 
@@ -63,15 +46,15 @@ struct DrawElementsIndirectCommand {
     uint  baseInstance;// used to offset the coordinates
 };
 
-struct Inputs {
+struct Input {
     uint count;
     uint firstIndex;
-    uint baseInstance;// is this always needed
+    int drawn;
     vec3 pos;
 };
 
 layout(binding = 0) readonly restrict buffer inputDataBuffer {
-    Inputs[] inputs;
+    Input[] inputs;
 };
 
 layout(binding = 1) writeonly restrict buffer firstPassBuffer {
@@ -82,42 +65,14 @@ layout(binding = 2) writeonly restrict buffer secondPassBuffer{
     DrawElementsIndirectCommand[] secondPassCommands;
 };
 
-uint calculateInputIndex(){
-    return gl_GlobalInvocationID.x;
-}
 
-    #ifndef useAtomicCounter
 
-    #define pushStart// push start;
-    #define pushEnd// push end;
-    #define getInstanceCount visible
-
-uint calculateOutputIndex(){
-    return gl_GlobalInvocationID.x;
-}
-
-    #else
-
-    #define pushStart if(visible != 0){ // push start
-    #define pushEnd }// push end
-    #define getInstanceCount 1
-
-    #ifdef useMultiAtomicCounter
-
-layout(binding = 0) uniform atomic_uint[multiAtomicCounterSize] counter;
-
-uint calculateOutputIndex(){
-    return atomicCounterIncrement(counter[gl_LocalInvocationID.x]);
-}
-    #else
 
 layout(binding = 0) uniform atomic_uint counter;
 
 uint calculateOutputIndex(){
     return atomicCounterIncrement(counter);
 }
-    #endif
-    #endif
 
 
     #ifdef useNoBranchFrustumCheck
@@ -144,30 +99,28 @@ uint insideFrustum(vec3 pos){
 
 void main()
 {
-    uint inputIndex = calculateInputIndex();
+    uint chunkId = gl_GlobalInvocationID.x;
 
-    uint count = inputData.count;
-    uint firstIndex = inputData.firstIndex;
-    uint baseInstance = inputData.baseInstance;
-    vec3 pos = inputData.pos;
+    Input inp = inputs[chunkId];
 
-    uint visible = insideFrustum(pos - camaraPos);
 
-    pushStart
+    uint visible = insideFrustum(inp.pos - camaraPos);
 
-uint outputIndex = calculateOutputIndex();
+    if (visible != 0){
 
-firstCommand.count = count;
-firstCommand.instanceCount = getInstanceCount;
-firstCommand.firstIndex = firstIndex;
-firstCommand.baseVertex = 0;
-firstCommand.baseInstance = baseInstance;
+        uint outputIndex = calculateOutputIndex();
 
-secondCommand.count = defaultCount;
-secondCommand.instanceCount = getInstanceCount;
-secondCommand.firstIndex = defaultIndex;
-secondCommand.baseVertex = 0;
-secondCommand.baseInstance = baseInstance;
+        firstCommand.count = inp.count;
+        firstCommand.instanceCount = 1;
+        firstCommand.firstIndex = inp.firstIndex;
+        firstCommand.baseVertex = 0;
+        firstCommand.baseInstance = chunkId;
 
-pushEnd
+        secondCommand.count = defaultCount;
+        secondCommand.instanceCount = 1;
+        secondCommand.firstIndex = defaultIndex;
+        secondCommand.baseVertex = 0;
+        secondCommand.baseInstance = chunkId;
+
+    }
 }

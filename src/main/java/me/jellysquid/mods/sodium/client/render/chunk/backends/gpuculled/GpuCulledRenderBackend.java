@@ -18,8 +18,11 @@ import me.jellysquid.mods.sodium.client.render.chunk.ChunkCameraContext;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderManager;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.lists.ChunkRenderListIterator;
+import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkRenderShaderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
+import me.jellysquid.mods.sodium.client.struct.Structs;
+import me.jellysquid.mods.sodium.client.struct.Structured;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.chunk.ChunkOcclusionData;
@@ -33,7 +36,9 @@ import net.minecraft.util.profiler.Profiler;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL32C;
 import org.lwjgl.opengl.GL42C;
+import org.lwjgl.opengl.GL46C;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -55,16 +60,22 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
     private final Program generatePassCommandsProgram;
 
 
-    private final GlMutableBuffer computeInputsBuffer;
-    private final GlMutableBuffer fragmentInputsBuffer;
-    private final GlMutableBuffer attributesBuffer;
+    private final @Structured(Structs.PreComputeInputs)
+    GlMutableBuffer computeInputsBuffer;
+    private final @Structured(Structs.PreComputeInputs)
+    GlMutableBuffer fragmentInputsBuffer;
+    private final @Structured(Structs.PreComputeInputs)
+    GlMutableBuffer attributesBuffer;
 
     private final GlMutableBuffer lameCube;
     private final GlMutableBuffer cubeIndexBuffer;
 
-    private final GlMutableBuffer firstPassCommandBuffer;
-    private final GlMutableBuffer secondPassCommandBuffer;
-    private final GlMutableBuffer thirdPassCommandBuffer;
+    private final @Structured(Structs.DrawElementsIndirectCommand)
+    GlMutableBuffer firstPassCommandBuffer;
+    private final @Structured(Structs.DrawElementsIndirectCommand)
+    GlMutableBuffer secondPassCommandBuffer;
+
+    private final GlMutableBuffer meshInfoCommandBuffer;
 
     private final GpuCullingChunkManager chunks;
 
@@ -80,6 +91,16 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
     ) {
         super(vertexType);
 
+        ByteBuffer starting_the_renderer = MemoryUtil.memUTF8("starting the renderer");
+        GL46C.glDebugMessageInsert(
+                GL46C.GL_DEBUG_SOURCE_APPLICATION,
+                GL46C.GL_DEBUG_TYPE_MARKER,
+                0,
+                GL46C.GL_DEBUG_SEVERITY_NOTIFICATION,
+                starting_the_renderer
+        );
+        MemoryUtil.memFree(starting_the_renderer);
+
         this.atomicSystem = atomicSystem;
 
         try (CommandList commandList = device.createCommandList()) {
@@ -93,16 +114,17 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             this.cubeIndexBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STATIC_DRAW);
             this.firstPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
             this.secondPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
-            this.thirdPassCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_COPY);
-            this.atomicCounters = this.atomicSystem == AtomicSystem.SSBO
-                    ? null
-                    : commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_READ);
+            this.meshInfoCommandBuffer = commandList.createMutableBuffer(GlBufferUsage.GL_STREAM_DRAW);
+            this.atomicCounters = commandList.createMutableBuffer(GlBufferUsage.GL_DYNAMIC_DRAW);
 
             this.drawChunkBoxPassVAO = commandList.createVertexArray();
 
             this.createLameCube(commandList);
 
             commandList.bindVertexArray(this.drawChunkBoxPassVAO);
+
+
+            commandList.bindBuffer(GlBufferTarget.ELEMENT_ARRAY_BUFFER, this.cubeIndexBuffer);
 
             // cube vertices
             commandList.bindBuffer(GlBufferTarget.ARRAY_BUFFER, this.lameCube);
@@ -230,12 +252,12 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
         var vertexShader = ShaderLoader.loadShader(device, ShaderType.VERTEX,
                 new Identifier("sodium", "gpu_side_culling/draw.v.glsl"),
                 this.getConstantBuilder()
-                        //.define("useColor")
+                        .define("useColor")
                         .build());
         var fragmentShader = ShaderLoader.loadShader(device, ShaderType.FRAGMENT,
                 new Identifier("sodium", "gpu_side_culling/draw.f.glsl"),
                 this.getConstantBuilder()
-                        //.define("useColor")
+                        .define("useColor")
                         .build());
         try {
             return GlProgram.builder(new Identifier("sodium", "gpu_side_culling/draw.v"))
@@ -307,9 +329,11 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
         this.chunks.setVisibilityData(sectionPos, occlusionData);
     }
 
+    private Profiler profiler;
+
     @Override
     public void beforeRender(MatrixStack matrixStack, double x, double y, double z, SodiumWorldRenderer sodiumWorldRenderer, ChunkRenderManager<GpuCulledChunkGraphicsState> gpuCulledChunkGraphicsStateChunkRenderManager, Matrix4f projectionMatrix) {
-        Profiler profiler = sodiumWorldRenderer.getWorld().getProfiler();
+        var profiler = this.profiler = sodiumWorldRenderer.getWorld().getProfiler();
         /*
          *  # Pre draw passes
          *
@@ -334,7 +358,7 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
         // TODO get frustum
 
-        profiler.push("GpuCullingBackend");
+        profiler.push("GpuCullingBackend:preRender");
 
         try (var commandList = RenderDevice.INSTANCE.createCommandList()) {
 
@@ -344,9 +368,21 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             // region step 0
             int i = this.chunks.generateInputBuffer(commandList, this.computeInputsBuffer, this.attributesBuffer, this.fragmentInputsBuffer);
 
-            commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 1, this.firstPassCommandBuffer, i * 20);
-            commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 2, this.secondPassCommandBuffer, i * 20);
-            commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 3, this.thirdPassCommandBuffer, i * 20);
+            try (var stack = this.chunks.memoryStack.push()) {
+                ByteBuffer zeroes = stack.calloc(20 * i);
+                commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 1, this.firstPassCommandBuffer, zeroes);
+                commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 2, this.secondPassCommandBuffer, zeroes);
+            }
+            // commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 1, this.firstPassCommandBuffer, i * 20);
+            // commandList.createDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 2, this.secondPassCommandBuffer, i * 20);
+
+            commandList.bindBuffer(GlBufferTarget.PARAMETER_BUFFER, this.atomicCounters);
+
+            try (var stack = MemoryStack.stackPush()) {
+                // TODO use better way to clear atomic counter
+                commandList.uploadDataBase(
+                        GlBufferTarget.ATOMIC_COUNTER_BUFFERS, 0, this.atomicCounters, stack.calloc(8));
+            }
 
             // endregion step 0
             profiler.swap("step 1");
@@ -381,10 +417,11 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
 
             commandList.bindVertexArray(this.drawChunkBoxPassVAO);
+            GL46C.glMemoryBarrier(GL46C.GL_ALL_BARRIER_BITS);
+            GL46C.glFinish();
 
             this.firstPassProgram.bind();
             commandList.bindBuffer(GlBufferTarget.DRAW_INDIRECT_BUFFER, this.firstPassCommandBuffer);
-            commandList.bindBuffer(GlBufferTarget.ELEMENT_ARRAY_BUFFER, this.cubeIndexBuffer);
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 Matrix4f modelViewMat = matrixStack.peek().getModel();
@@ -402,10 +439,19 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
             GlFunctions.INDIRECT_DRAW.glMultiDrawElementArraysIndirect(
                     GlPrimitiveType.TRIANGLES.getId(),
                     GL32C.GL_UNSIGNED_SHORT,
-                    0,
+                    0L,
                     i,
                     0
             );
+
+            /*GlFunctions.INDIRECT_COUNT_DRAW.glMultiDrawElementArraysIndirectCount(
+                    GlPrimitiveType.TRIANGLES.getId(),
+                    GL32C.GL_UNSIGNED_SHORT,
+                    0L,
+                    0L,
+                    i,
+                    0
+            );*/
 
             // endregion step 2
             profiler.swap("part 3");
@@ -432,16 +478,22 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
 
                 GL20C.glUniformMatrix4fv(this.secondPassProgram.uModelViewProjectionMatrix, false, projectionBuffer);
                 GL32C.glUniform3f(this.secondPassProgram.uCamaraPos, (float) x, (float) y, (float) z);
-                commandList.uploadDataBase(
-                        GlBufferTarget.ATOMIC_COUNTER_BUFFERS, 0, this.atomicCounters, stack.calloc(4));
             }
 
-
+/*
             // dispatch call
+            GlFunctions.INDIRECT_COUNT_DRAW.glMultiDrawElementArraysIndirectCount(
+                    GlPrimitiveType.TRIANGLES.getId(),
+                    GL32C.GL_UNSIGNED_SHORT,
+                    0L,
+                    0L,
+                    i,
+                    0
+            );*/
             GlFunctions.INDIRECT_DRAW.glMultiDrawElementArraysIndirect(
                     GlPrimitiveType.TRIANGLES.getId(),
                     GL32C.GL_UNSIGNED_SHORT,
-                    0,
+                    0L,
                     i,
                     0
             );
@@ -453,8 +505,15 @@ public class GpuCulledRenderBackend extends ChunkRenderShaderBackend<GpuCulledCh
     }
 
     @Override
-    public void render(CommandList commandList, ChunkRenderListIterator<GpuCulledChunkGraphicsState> renders, ChunkCameraContext camera) {
+    public void render(CommandList commandList, ChunkRenderListIterator<GpuCulledChunkGraphicsState> renders, ChunkCameraContext camera, BlockRenderPass pass) {
+        // I kinda want to skip the current render system, as it's doing work that can be pushed to the gpu
 
+
+        var profiler = this.profiler;
+        profiler.push("GpuCullingBackend:preRender");
+
+
+        profiler.pop();
     }
 
 

@@ -8,9 +8,9 @@ layout(location = 0) in vec3 a_Pos;// The position of the vertex
 // The model translation for this draw call.
 layout(location = 1) in vec4 d_ModelOffset;
 
-#ifdef secondPass
+/*#ifdef secondPass
 layout(location = 2) in int in_chunkId;
-#endif
+#endif*/
 
 uniform mat4 u_ModelViewProjectionMatrix;
 uniform vec3 camaraPos;
@@ -31,13 +31,13 @@ void main() {
 
     #ifdef useColor
     color = vec4(
-    mod(d_ModelOffset.xyz * 2.5922 + d_ModelOffset.zzx * 365.1587 + d_ModelOffset.yzy * 985.98 - d_ModelOffset.yxx * 645.06 + vec3(.315, .761, .9841), vec3(1.0)),
+    mod(d_ModelOffset.xyz * .5922 + d_ModelOffset.zzx * .1587 + d_ModelOffset.yzy * .98 - d_ModelOffset.yxx * .06 + vec3(.315, .761, .9841), vec3(1.0)),
     1
     );
     #endif
 
     #ifdef secondPass
-    chunkId = gl_DrawID;//int(d_ModelOffset.w);//in_chunkId;
+    chunkId = gl_BaseInstance;
     #endif
 }
 

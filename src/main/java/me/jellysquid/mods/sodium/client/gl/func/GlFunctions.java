@@ -9,6 +9,7 @@ public class GlFunctions {
     public static final GlVertexArrayFunctions VERTEX_ARRAY = GlVertexArrayFunctions.load(capabilities);
     public static final GlBufferCopyFunctions BUFFER_COPY = GlBufferCopyFunctions.load(capabilities);
     public static final GlIndirectMultiDrawFunctions INDIRECT_DRAW = GlIndirectMultiDrawFunctions.load(capabilities);
+    public static final GlIndirectMultiDrawIndirectParametersFunctions INDIRECT_COUNT_DRAW = GlIndirectMultiDrawIndirectParametersFunctions.load(capabilities);
     public static final GlInstancedArrayFunctions INSTANCED_ARRAY = GlInstancedArrayFunctions.load(capabilities);
 
     public static boolean isVertexArraySupported() {

@@ -32,7 +32,6 @@ import me.jellysquid.mods.sodium.client.render.chunk.region.ChunkRegionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkRenderShaderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
 import net.minecraft.client.render.VertexFormat;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Util;
 import org.lwjgl.opengl.GL20C;
 
@@ -40,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -190,7 +188,7 @@ public class MultidrawChunkRenderBackend extends ChunkRenderShaderBackend<Multid
     }
 
     @Override
-    public void render(CommandList commandList, ChunkRenderListIterator<MultidrawGraphicsState> renders, ChunkCameraContext camera) {
+    public void render(CommandList commandList, ChunkRenderListIterator<MultidrawGraphicsState> renders, ChunkCameraContext camera, BlockRenderPass pass) {
         this.bufferManager.cleanup();
 
         this.setupDrawBatches(commandList, renders, camera);

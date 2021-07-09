@@ -6,6 +6,7 @@ import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.lists.ChunkRenderListIterator;
+import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import net.minecraft.client.render.chunk.ChunkOcclusionData;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -30,12 +31,12 @@ public interface ChunkRenderBackend<T extends ChunkGraphicsState> {
 
     /**
      * Renders the given chunk render list to the active framebuffer.
-     *
-     * @param commandList The command list which OpenGL commands should be serialized to
+     *  @param commandList The command list which OpenGL commands should be serialized to
      * @param renders     An iterator over the list of chunks to be rendered
      * @param camera      The camera context containing chunk offsets for the current render
+     * @param pass
      */
-    void render(CommandList commandList, ChunkRenderListIterator<T> renders, ChunkCameraContext camera);
+    void render(CommandList commandList, ChunkRenderListIterator<T> renders, ChunkCameraContext camera, BlockRenderPass pass);
 
     void createShaders(RenderDevice device);
 

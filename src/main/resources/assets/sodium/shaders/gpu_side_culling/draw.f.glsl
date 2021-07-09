@@ -6,21 +6,10 @@
 // #define useColor
 
 
-#ifdef __SODIUM__ATOMICS__USE_SSBO
+layout(binding = 0) uniform atomic_uint[2] _counter;
 
-#define inlineAtomicCounter
+#define counter _counter[1];
 
-#else
-#ifdef __SODIUM__ATOMICS__USE_AC
-
-layout(binding = 0) uniform atomic_uint counter;
-
-#else
-
-#error No AtomicSystem has been selected
-
-#endif
-#endif
 
 #ifdef useColor
 out vec4 fragColor;
@@ -34,66 +23,35 @@ layout(early_fragment_tests) in;
 
 #ifdef secondPass
 
-#define FLAG_IN_MEMORY 1
-#define FLAG_DRAWN 2
-
-struct ChunkStatus {
-    int status;
-    vec3 chunkPos;
+struct Input {
+    uint count;
+    uint firstIndex;
+    int drawn;
+    vec3 pos;
 };
 
-layout(binding = 4) restrict buffer inputDataBuffer {
-#ifdef inlineAtomicCounter
-    uint nextIndex;
-    #endif
-    ChunkStatus[] chunkStatusList;
-};
-
-struct DrawElementsIndirectCommand {
-    uint  count;// depends on shape
-    uint  instanceCount;// 1 if visible, 0 if not
-    uint  firstIndex;// used to select shape
-    uint  baseVertex;// always 0?
-    uint  baseInstance;// used to offset the coordinates
-};
-
-layout(binding = 3) writeonly restrict buffer drawCommandBuffer {
-    DrawElementsIndirectCommand[] drawCommands;
+layout(binding = 0) writeonly restrict buffer inputDataBuffer {
+    Input[] inputs;
 };
 
 flat in int chunkId;
-#define chunkStatus chunkStatusList[chunkId]
-
-
-#ifdef inlineAtomicCounter
-uint calculateOutputIndex(){
-    return atomicAdd(nextIndex, 1);
-}
-    #else
-uint calculateOutputIndex(){
-    return atomicCounterIncrement(counter);
-}
-    #endif
-
-    #define drawCommand drawCommands[drawIndex]
 
     #endif
-
 
 
 
 
 void main() {
     #ifdef useColor
-    #ifndef secondPass2
-    fragColor = vec4(mod(vec3(.9852 * chunkId, .35496 * chunkId, .1265 * chunkId), 1.0), 1.0);
-    #else
+    //#ifndef secondPass2
+    //fragColor = vec4(mod(vec3(.9852 * chunkId, .35496 * chunkId, .1265 * chunkId), 1.0), 1.0);
+    //#else
     fragColor = color;
-    #endif
+    //#endif
     #endif
 
     #ifdef secondPass
-    atomicOr(chunkStatus.status, 1);
+    inputs[chunkId].drawn = 1;
     #endif
 }
 
