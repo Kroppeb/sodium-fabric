@@ -6,13 +6,12 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferSegment;
 import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexFormat;
-import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferTarget;
-import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferUsage;
-import me.jellysquid.mods.sodium.client.gl.buffer.GlMutableBuffer;
-import me.jellysquid.mods.sodium.client.gl.buffer.VertexData;
+import me.jellysquid.mods.sodium.client.gl.buffer.*;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
+import me.jellysquid.mods.sodium.client.gl.util.BufferSlice;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.backends.multidraw.ChunkDrawCallBatcher;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkMeshData;
@@ -45,11 +44,17 @@ public class GpuCullingChunkManager {
 
     private final ObjectArrayList<ChunkBuildResult<GpuCulledChunkGraphicsState>> uploadQueue;
     private final Object2IntMap<ChunkSectionPos> occlusionData;
+    private final Object2IntMap<ChunkSectionPos> lastChunkId;
     private final EnumMap<
             BlockRenderPass,
             Map<
                     ChunkSectionPos,
                     PassChunkDataHolder>> meshDataLocation;
+
+    public GlBuffer getArena() {
+        return this.arena.getBuffer();
+    }
+
 
 //    private GlTessellation tessellation;
 
@@ -69,6 +74,7 @@ public class GpuCullingChunkManager {
         this.arena = new GlBufferArena(device, arenaSize, arenaSize);
         this.uploadQueue = new ObjectArrayList<>();
         this.occlusionData = new Object2IntOpenHashMap<>(size);
+        this.lastChunkId = new Object2IntOpenHashMap<>(size);
         this.meshDataLocation = new EnumMap<>(BlockRenderPass.class);
 
         for (var pass : BlockRenderPass.VALUES) {
@@ -234,18 +240,24 @@ public class GpuCullingChunkManager {
             CommandList commandList,
             @Structured(PreComputeInputs) GlMutableBuffer computeInputsBuffer,
             @Structured(Vec3) GlMutableBuffer attributesBuffer,
-            @Structured(Int) GlMutableBuffer fragmentInputsBuffer) {
+            @Structured(Int) GlMutableBuffer fragmentInputsBuffer,
+            double cameraX, double cameraY, double cameraZ,
+            ChunkVertexType vertexType) {
         System.out.println("occlusion data: " + this.occlusionData.size());
         System.out.println("gpu buffer size: " + ((GlMutableBuffer) this.arena.getBuffer()).getSize());
+
+        this.lastChunkId.clear();
+
 
         // using our own stack to avoid out of memory caused by memory leak
         try (MemoryStack stack = memoryStack.push()) {
             @Structured(PreComputeInputs) ByteBuffer preComputeInputs = stack.malloc(this.occlusionData.size() * PreComputeInputs.size);
-                    @Structured(Vec3) ByteBuffer chunkPositions = stack.malloc(this.occlusionData.size() * Vec3.size);
+            @Structured(Vec3) ByteBuffer chunkPositions = stack.malloc(this.occlusionData.size() * Vec3.size);
             @Structured(Int) ByteBuffer chunkStatus = stack.malloc(this.occlusionData.size() * Int.size);
 
             /*fragmentInputs.putInt(0); // initialise index with 0*/
 
+            int index = 0;
             for (Object2IntMap.Entry<ChunkSectionPos> entry : this.occlusionData.object2IntEntrySet()) {
                 /*
                 struct Inputs {
@@ -264,18 +276,20 @@ public class GpuCullingChunkManager {
                 preComputeInputs.putInt(0); // drawn state
                 preComputeInputs.putInt(0); // align to 16
 
-                preComputeInputs.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
-                preComputeInputs.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
-                preComputeInputs.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
+                preComputeInputs.putFloat((float) (chunkSectionPos.getMinX() + 8.0d - cameraX));
+                preComputeInputs.putFloat((float) (chunkSectionPos.getMinY() + 8.0d - cameraY));
+                preComputeInputs.putFloat((float) (chunkSectionPos.getMinZ() + 8.0d - cameraZ));
                 preComputeInputs.putInt(0); // vec3 needs 4 "floats"
 
-                chunkPositions.putFloat(chunkSectionPos.getX() * 16.0f + 8.0f);
-                chunkPositions.putFloat(chunkSectionPos.getY() * 16.0f + 8.0f);
-                chunkPositions.putFloat(chunkSectionPos.getZ() * 16.0f + 8.0f);
+                chunkPositions.putFloat((float) (chunkSectionPos.getMinX() - cameraX - 8.0d)); // i don't know why it's - 8
+                chunkPositions.putFloat((float) (chunkSectionPos.getMinY() - cameraY - 8.0d)); // i don't know why it's - 8
+                chunkPositions.putFloat((float) (chunkSectionPos.getMinZ() - cameraZ - 8.0d)); // i don't know why it's - 8
                 chunkPositions.putInt(0); // vec3 needs 4 "floats"
 
                 chunkStatus.putInt(0);
 
+
+                this.lastChunkId.put(chunkSectionPos, index++);
             }
 
             preComputeInputs.rewind();
@@ -290,6 +304,71 @@ public class GpuCullingChunkManager {
             commandList.uploadData(GlBufferTarget.ARRAY_BUFFER, attributesBuffer, chunkPositions);
             commandList.unbindBuffer(GlBufferTarget.ARRAY_BUFFER);
             return this.occlusionData.size();
+        }
+    }
+
+    public long uploadPass(
+            CommandList commandList,
+            BlockRenderPass pass,
+            GlVertexFormat<?> vertexFormat,
+            @Structured(ChunkMeshPass) GlMutableBuffer meshInfoCommandBuffer,
+            double x, double y, double z
+    ) {
+
+        int maxSize = 0;
+        try (var stack = memoryStack.push()) {
+            var meshes = this.meshDataLocation.get(pass);
+
+            @Structured(ChunkMeshPass) ByteBuffer buffer = stack.malloc(meshes.size() * ChunkMeshPass.size);
+
+            for (var entry : meshes.entrySet()) {
+                ChunkSectionPos chunkSectionPos = entry.getKey();
+                int chunkId = this.lastChunkId.getInt(chunkSectionPos);
+
+                PassChunkDataHolder values = entry.getValue();
+                var sliceMap = values.chunkMeshData().getSliceMap();
+                buffer.putInt(chunkId);
+
+                for (var dir : ModelQuadFacing.VALUES) {
+                    BufferSlice bufferSlice = sliceMap.get(dir);
+                    if (bufferSlice == null) {
+                        buffer.putInt(0);
+                        buffer.putInt(0);
+                        buffer.putInt(0);
+                    } else {
+                        int size = bufferSlice.len / vertexFormat.getStride() * 6 / 4; // size -> vertex count -> index
+                        int start = (bufferSlice.start + values.segment().getStart()) / vertexFormat.getStride();
+                        if (size > maxSize) {
+                            maxSize = size;
+                        }
+
+                        buffer.putInt(size);
+                        buffer.putInt(0);
+                        buffer.putInt(start);
+                    }
+                }
+
+                buffer.putInt(0); // vec3 needs to be aligned to 16 bytes;
+                buffer.putInt(0);
+
+                // default bounds atm
+                buffer.putFloat((float) (chunkSectionPos.getMinX() - 0.5d - x));
+                buffer.putFloat((float) (chunkSectionPos.getMinY() - 0.5d - y));
+                buffer.putFloat((float) (chunkSectionPos.getMinZ() - 0.5d - z));
+                buffer.putInt(0); // vec3 uses 4 floats
+
+                buffer.putFloat((float) (chunkSectionPos.getMaxX() + 0.5f - x));
+                buffer.putFloat((float) (chunkSectionPos.getMaxY() + 0.5f - y));
+                buffer.putFloat((float) (chunkSectionPos.getMaxZ() + 0.5f - z));
+                buffer.putInt(0); // vec3 uses 4 floats
+
+            }
+
+            buffer.rewind();
+
+            commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 3, meshInfoCommandBuffer, buffer);
+
+            return meshes.size() | ((long) maxSize << 32);
         }
     }
 

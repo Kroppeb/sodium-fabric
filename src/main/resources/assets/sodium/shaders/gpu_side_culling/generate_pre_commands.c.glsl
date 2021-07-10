@@ -34,7 +34,6 @@
 #define secondCommand secondPassCommands[outputIndex]
 
 uniform vec4[6] frustum;
-uniform vec3 camaraPos;// could be applied to the frustum in cpu land
 
 layout(local_size_x = 1) in;
 
@@ -104,7 +103,7 @@ void main()
     Input inp = inputs[chunkId];
 
 
-    uint visible = insideFrustum(inp.pos - camaraPos);
+    uint visible = insideFrustum(inp.pos);
 
     if (visible != 0){
 

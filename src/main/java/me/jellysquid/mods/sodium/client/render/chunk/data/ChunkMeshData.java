@@ -45,6 +45,10 @@ public class ChunkMeshData {
         return 0;
     }
 
+    public Map<? super ModelQuadFacing, ? extends BufferSlice> getSliceMap() {
+        return this.parts;
+    }
+
     public Iterable<? extends Map.Entry<ModelQuadFacing, BufferSlice>> getSlices() {
         return this.parts.entrySet();
     }

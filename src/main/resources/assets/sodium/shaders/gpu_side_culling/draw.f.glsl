@@ -6,9 +6,6 @@
 // #define useColor
 
 
-layout(binding = 0) uniform atomic_uint[2] _counter;
-
-#define counter _counter[1];
 
 
 #ifdef useColor

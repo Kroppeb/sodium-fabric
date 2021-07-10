@@ -13,9 +13,9 @@ layout(location = 2) in int in_chunkId;
 #endif*/
 
 uniform mat4 u_ModelViewProjectionMatrix;
-uniform vec3 camaraPos;
 
 #ifdef useColor
+uniform vec3 camaraPos;
 out vec4 color;
 #endif
 
@@ -24,14 +24,15 @@ flat out int chunkId;
 #endif
 
 void main() {
-    vec3 pos = a_Pos  + d_ModelOffset.xyz - camaraPos;
+    vec3 pos = a_Pos  + d_ModelOffset.xyz + vec3(16);
 
     // Transform the vertex position into model-view-projection space
     gl_Position = u_ModelViewProjectionMatrix * vec4(pos, 1.0);
 
     #ifdef useColor
+    vec3 colorPos = d_ModelOffset.xyz + camaraPos;
     color = vec4(
-    mod(d_ModelOffset.xyz * .5922 + d_ModelOffset.zzx * .1587 + d_ModelOffset.yzy * .98 - d_ModelOffset.yxx * .06 + vec3(.315, .761, .9841), vec3(1.0)),
+    mod(colorPos.xyz * .5922 + colorPos.zzx * .1587 + colorPos.yzy * .98 - colorPos.yxx * .06 + vec3(.315, .761, .9841), vec3(1.0)),
     1
     );
     #endif

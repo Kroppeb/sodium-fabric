@@ -15,11 +15,6 @@ struct ChunkBounds {
     vec3 upper;
 };
 
-struct ChunkStatus {
-    int status;
-    vec3 chunkPos;
-};
-
 struct MeshInfo {
     uint size;
     uint firstIndex;
@@ -28,7 +23,6 @@ struct MeshInfo {
 
 struct ChunkMeshPass{
     int chunkId;
-    ChunkBounds bounds;
     MeshInfo up;
     MeshInfo down;
     MeshInfo east;
@@ -36,6 +30,7 @@ struct ChunkMeshPass{
     MeshInfo south;
     MeshInfo north;
     MeshInfo unassigned;
+    ChunkBounds bounds;
 };
 
 struct Input {
@@ -63,15 +58,18 @@ layout(binding = 3) readonly restrict buffer meshInfoBufferBuffer {
 layout(binding = 0) uniform atomic_uint counter;
 
 
-uniform vec3 camaraPos;
 
-void addCall(MeshInfo info){
+void addCall(MeshInfo info, int id){
+    if (info.size <= 0) {
+        return;
+    }
+
     DrawElementsIndirectCommand command;
     command.count = info.size;
     command.instanceCount = 1;
     command.firstIndex = info.firstIndex;
     command.baseVertex = info.baseVertex;
-    command.baseInstance = 0;// TODO
+    command.baseInstance = id;// TODO
 
     DEICBuffer[atomicCounterIncrement(counter)] = command;
 }
@@ -83,31 +81,29 @@ void main()
     ChunkBounds bounds = pass.bounds;
 
     if (status.drawn == 0) return;
-    if (pass.unassigned.size > 0){
-        addCall(pass.unassigned);
+    addCall(pass.unassigned, pass.chunkId);
+
+    if (0 > bounds.lower.y) {
+        addCall(pass.up, pass.chunkId);
     }
 
-    if (camaraPos.y > bounds.lower.y) {
-        addCall(pass.up);
+    if (0 < bounds.upper.y) {
+        addCall(pass.down, pass.chunkId);
     }
 
-    if (camaraPos.y < bounds.upper.y) {
-        addCall(pass.down);
+    if (0 > bounds.lower.x) {
+        addCall(pass.east, pass.chunkId);
     }
 
-    if (camaraPos.x > bounds.lower.x) {
-        addCall(pass.east);
+    if (0 < bounds.upper.x) {
+        addCall(pass.west, pass.chunkId);
     }
 
-    if (camaraPos.x < bounds.upper.x) {
-        addCall(pass.west);
+    if (0 > bounds.lower.z) {
+        addCall(pass.south, pass.chunkId);
     }
 
-    if (camaraPos.z > bounds.lower.z) {
-        addCall(pass.south);
-    }
-
-    if (camaraPos.z < bounds.upper.z) {
-        addCall(pass.north);
+    if (0 < bounds.upper.z) {
+        addCall(pass.north, pass.chunkId);
     }
 }

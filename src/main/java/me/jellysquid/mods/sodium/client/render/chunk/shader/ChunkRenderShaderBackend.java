@@ -30,7 +30,7 @@ public abstract class ChunkRenderShaderBackend<T extends ChunkGraphicsState>
         this.vertexFormat = vertexType.getCustomVertexFormat();
     }
 
-    private ChunkProgram createShader(RenderDevice device, ChunkFogMode fogMode, GlVertexFormat<ChunkMeshAttribute> vertexFormat) {
+    public static ChunkProgram createShader(RenderDevice device, ChunkFogMode fogMode, GlVertexFormat<ChunkMeshAttribute> vertexFormat) {
         GlShader vertShader = ShaderLoader.loadShader(device, ShaderType.VERTEX,
                 new Identifier("sodium", "chunk_gl32.v.glsl"), fogMode.getDefines());
 

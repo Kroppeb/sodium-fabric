@@ -7,45 +7,45 @@ public enum Structs {
     Vec3(4 * 4),
 
     /**
-     * uint count;
-     * uint instanceCount;
-     * uint firstIndex;
-     * uint baseVertex;
-     * uint baseInstance;
+     * {@code uint count;}<br/>
+     * {@code uint instanceCount;}<br/>
+     * {@code uint firstIndex;}<br/>
+     * {@code uint baseVertex;}<br/>
+     * {@code uint baseInstance;}<br/>
      */
     DrawElementsIndirectCommand(20),
 
     /**
-     * uint count;
-     * uint firstIndex;
-     * int drawn;
-     * vec3 pos;
+     * {@code uint count;} <br/>
+     * {@code uint firstIndex;} <br/>
+     * {@code int drawn;} <br/>
+     * {@code vec3 pos;} <br/>
      */
     PreComputeInputs(4 * 4 + Vec3.size),
 
     /**
-     * vec3 lower;
-     * vec3 upper;
+     * {@code vec3 lower;} <br/>
+     * {@code vec3 upper;} <br/>
      */
     ChunkBounds(2 * Vec3.size),
 
     /**
-     * uint size;
-     * uint firstIndex;
-     * uint baseVertex;
+     * {@code uint size;} <br/>
+     * {@code uint firstIndex;} <br/>
+     * {@code uint baseVertex;} <br/>
      */
     MeshInfo(3 * 4),
 
     /**
-     * int chunkId;
-     * MeshInfo up;
-     * MeshInfo down;
-     * MeshInfo east;
-     * MeshInfo west;
-     * MeshInfo south;
-     * MeshInfo north;
-     * MeshInfo unassigned;
-     * ChunkBounds bounds;
+     * {@code int chunkId;} <br/>
+     * {@link Structs#MeshInfo} {@code up;} <br/>
+     * {@link Structs#MeshInfo} {@code down;} <br/>
+     * {@link Structs#MeshInfo} {@code east;} <br/>
+     * {@link Structs#MeshInfo} {@code west;} <br/>
+     * {@link Structs#MeshInfo} {@code south;} <br/>
+     * {@link Structs#MeshInfo} {@code north;} <br/>
+     * {@link Structs#MeshInfo} {@code unassigned;} <br/>
+     * {@link Structs#ChunkBounds} {@code bounds;} <br/>
      */
     ChunkMeshPass(128), // seems 124 is not a valid stride
 
