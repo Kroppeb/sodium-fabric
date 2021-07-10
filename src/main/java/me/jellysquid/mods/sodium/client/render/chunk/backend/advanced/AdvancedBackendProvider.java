@@ -1,0 +1,24 @@
+package me.jellysquid.mods.sodium.client.render.chunk.backend.advanced;
+
+import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
+import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
+import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
+import me.jellysquid.mods.sodium.client.render.chunk.format.sfp.ModelVertexType;
+
+public final class AdvancedBackendProvider implements BackendProvider {
+    public static final AdvancedBackendProvider INSTANCE = new AdvancedBackendProvider();
+
+    private AdvancedBackendProvider() {
+    }
+
+    @Override
+    public boolean isSupported(SodiumGameOptions options) {
+        return false;
+    }
+
+    @Override
+    public ChunkRenderer createChunkRenderer(RenderDevice device, ModelVertexType vertexType) {
+        throw new UnsupportedOperationException();
+    }
+}

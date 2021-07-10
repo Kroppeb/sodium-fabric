@@ -7,6 +7,7 @@ import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.RegionChunkRenderer;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkModelVertexFormats;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
@@ -249,7 +250,10 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         this.renderDistance = this.client.options.viewDistance;
 
         this.renderPassManager = BlockRenderPassManager.createDefaultMappings();
-        this.chunkRenderer = new RegionChunkRenderer(device, ChunkModelVertexFormats.DEFAULT);
+
+        var backendProvider = BackendProvider.getBackend(SodiumClientMod.options());
+
+        this.chunkRenderer =  backendProvider.createChunkRenderer(device, ChunkModelVertexFormats.DEFAULT);
 
         this.renderSectionManager = new RenderSectionManager(this, this.chunkRenderer, this.renderPassManager, this.world, this.renderDistance);
         this.renderSectionManager.loadChunks();
