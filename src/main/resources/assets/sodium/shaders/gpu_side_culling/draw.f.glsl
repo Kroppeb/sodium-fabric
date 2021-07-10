@@ -27,7 +27,7 @@ struct Input {
     vec3 pos;
 };
 
-layout(binding = 0) writeonly restrict buffer inputDataBuffer {
+layout(std430, binding = 0) writeonly restrict buffer inputDataBuffer {
     Input[] inputs;
 };
 

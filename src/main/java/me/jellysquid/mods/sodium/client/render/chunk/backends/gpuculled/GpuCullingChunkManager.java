@@ -40,7 +40,6 @@ public class GpuCullingChunkManager {
     private final RenderDevice device;
 
     private final GlBufferArena arena;
-    private final ChunkDrawCallBatcher batch;
 
     private final ObjectArrayList<ChunkBuildResult<GpuCulledChunkGraphicsState>> uploadQueue;
     private final Object2IntMap<ChunkSectionPos> occlusionData;
@@ -69,6 +68,7 @@ public class GpuCullingChunkManager {
 
     public GpuCullingChunkManager(RenderDevice device, int size) {
         this.device = device;
+        size *= 10;
         int arenaSize = size * EXPECTED_CHUNK_SIZE;
 
         this.arena = new GlBufferArena(device, arenaSize, arenaSize);
@@ -80,8 +80,6 @@ public class GpuCullingChunkManager {
         for (var pass : BlockRenderPass.VALUES) {
             this.meshDataLocation.put(pass, new HashMap<>(size));
         }
-
-        this.batch = ChunkDrawCallBatcher.create(size * ModelQuadFacing.COUNT);
 
         try (CommandList commands = device.createCommandList()) {
             this.uploadBuffer = commands.createMutableBuffer(GlBufferUsage.GL_DYNAMIC_DRAW);
@@ -110,15 +108,10 @@ public class GpuCullingChunkManager {
         }*/
 
         this.arena.delete();
-        this.batch.delete();
     }
 
     private ObjectArrayList<ChunkBuildResult<GpuCulledChunkGraphicsState>> getUploadQueue() {
         return this.uploadQueue;
-    }
-
-    private ChunkDrawCallBatcher getDrawBatcher() {
-        return this.batch;
     }
 
 
@@ -273,7 +266,7 @@ public class GpuCullingChunkManager {
 
                 preComputeInputs.putInt(ChunkCubeLookup.lookupCount(occlusionData));
                 preComputeInputs.putInt(ChunkCubeLookup.lookupStart(occlusionData));
-                preComputeInputs.putInt(0); // drawn state
+                preComputeInputs.putInt(1); // drawn state
                 preComputeInputs.putInt(0); // align to 16
 
                 preComputeInputs.putFloat((float) (chunkSectionPos.getMinX() + 8.0d - cameraX));

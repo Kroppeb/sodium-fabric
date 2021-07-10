@@ -40,17 +40,17 @@ struct Input {
     vec3 pos;
 };
 
-layout(binding = 0) readonly restrict buffer inputDataBuffer {
+layout(std430, binding = 0) readonly restrict buffer inputDataBuffer {
     Input[] inputs;
 };
 
 // we can reuse the buffer from pass 1 or 2
-layout(binding = 1) writeonly restrict buffer DEICBufferBuffer{
+layout(std430, binding = 1) writeonly restrict buffer DEICBufferBuffer{
     DrawElementsIndirectCommand[] DEICBuffer;
 };
 
 
-layout(binding = 3) readonly restrict buffer meshInfoBufferBuffer {
+layout(std430, binding = 3) readonly restrict buffer meshInfoBufferBuffer {
     ChunkMeshPass[] meshInfoBuffer;
 };
 

@@ -52,15 +52,15 @@ struct Input {
     vec3 pos;
 };
 
-layout(binding = 0) readonly restrict buffer inputDataBuffer {
+layout(std430, binding = 0) readonly restrict buffer inputDataBuffer {
     Input[] inputs;
 };
 
-layout(binding = 1) writeonly restrict buffer firstPassBuffer {
+layout(std430, binding = 1) writeonly restrict buffer firstPassBuffer {
     DrawElementsIndirectCommand[] firstPassCommands;
 };
 
-layout(binding = 2) writeonly restrict buffer secondPassBuffer{
+layout(std430, binding = 2) writeonly restrict buffer secondPassBuffer{
     DrawElementsIndirectCommand[] secondPassCommands;
 };
 
