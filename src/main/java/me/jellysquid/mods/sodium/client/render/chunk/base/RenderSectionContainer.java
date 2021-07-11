@@ -4,6 +4,7 @@ import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.SectionCuller;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
+import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 
 import java.util.Collection;
@@ -15,7 +16,14 @@ import java.util.Iterator;
  */
 public interface RenderSectionContainer extends SectionCuller.FrustumChecker {
     // TODO: figure out why this doesn't need the camera
+    // TODO: shouldn't be needed in the render section by default
+    @Deprecated
     void updateVisibility(FrustumExtended frustum);
+
+    @Override
+    @Deprecated
+    // TODO: shouldn't be needed in the render section by default
+    boolean getVisibility(ChunkGraphInfo section, FrustumExtended frustum);
 
     RenderSection createSection(RenderSectionManager renderSectionManager, int x, int y, int z);
 
