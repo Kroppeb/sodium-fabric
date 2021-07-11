@@ -24,7 +24,8 @@ import java.util.concurrent.CompletableFuture;
  * data about the render in the chunk visibility graph.
  */
 public class RenderSection {
-    private final SodiumWorldRenderer worldRenderer;
+    @Deprecated
+    private final RenderSectionManager renderSectionManager;
     private final int chunkX, chunkY, chunkZ;
 
     private final Map<BlockRenderPass, ChunkGraphicsState> graphicsStates;
@@ -43,8 +44,8 @@ public class RenderSection {
 
     private int lastAcceptedBuildTime = -1;
 
-    public RenderSection(SodiumWorldRenderer worldRenderer, int chunkX, int chunkY, int chunkZ, RenderRegion region) {
-        this.worldRenderer = worldRenderer;
+    public RenderSection(RenderSectionManager renderSectionManager, int chunkX, int chunkY, int chunkZ, RenderRegion region) {
+        this.renderSectionManager = renderSectionManager;
         this.region = region;
 
         this.chunkX = chunkX;
@@ -106,7 +107,7 @@ public class RenderSection {
             throw new NullPointerException("Mesh information must not be null");
         }
 
-        this.worldRenderer.onChunkRenderUpdated(this.chunkX, this.chunkY, this.chunkZ, this.data, info);
+        this.renderSectionManager.onChunkRenderUpdated(this.chunkX, this.chunkY, this.chunkZ, this.data, info);
         this.data = info;
 
         this.tickable = !info.getAnimatedSprites().isEmpty();

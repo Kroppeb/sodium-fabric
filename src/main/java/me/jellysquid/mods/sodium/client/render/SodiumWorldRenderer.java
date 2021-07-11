@@ -1,14 +1,11 @@
 package me.jellysquid.mods.sodium.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
-import me.jellysquid.mods.sodium.client.render.chunk.RegionChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
-import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkModelVertexFormats;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
@@ -18,7 +15,6 @@ import me.jellysquid.mods.sodium.client.util.NativeBuffer;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import me.jellysquid.mods.sodium.client.world.ChunkStatusListener;
 import me.jellysquid.mods.sodium.client.world.ClientChunkManagerExtended;
-import me.jellysquid.mods.sodium.common.util.ListUtil;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -52,8 +48,6 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
 
     private boolean useEntityCulling;
 
-    private final Set<BlockEntity> globalBlockEntities = new ObjectOpenHashSet<>();
-
     private Frustum frustum;
     private RenderSectionManager renderSectionManager;
     private BlockRenderPassManager renderPassManager;
@@ -71,8 +65,8 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
     }
 
     /**
-     * @throws IllegalStateException If the renderer has not yet been created
      * @return The current instance of this type
+     * @throws IllegalStateException If the renderer has not yet been created
      */
     public static SodiumWorldRenderer getInstance() {
         if (instance == null) {
@@ -125,8 +119,6 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
             this.chunkRenderer.delete();
             this.chunkRenderer = null;
         }
-
-        this.globalBlockEntities.clear();
 
         this.world = null;
     }
@@ -253,9 +245,12 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
 
         var backendProvider = BackendProvider.getBackend(SodiumClientMod.options());
 
-        this.chunkRenderer =  backendProvider.createChunkRenderer(device, ChunkModelVertexFormats.DEFAULT);
+        this.chunkRenderer = backendProvider.createChunkRenderer(device, ChunkModelVertexFormats.DEFAULT);
 
-        this.renderSectionManager = new RenderSectionManager(this, this.chunkRenderer, this.renderPassManager, this.world, this.renderDistance);
+        this.renderSectionManager = backendProvider.createRenderSectionManager(
+                this.chunkRenderer,
+                this.renderPassManager,
+                this.world, backendProvider.createCuller(this.world, this.renderDistance));
         this.renderSectionManager.loadChunks();
     }
 
@@ -295,7 +290,7 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
             matrices.pop();
         }
 
-        for (BlockEntity blockEntity : this.globalBlockEntities) {
+        for (BlockEntity blockEntity : this.renderSectionManager.getGlobalBlockEntities()) {
             BlockPos pos = blockEntity.getPos();
 
             matrices.push();
@@ -317,14 +312,9 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         this.renderSectionManager.onChunkRemoved(x, z);
     }
 
-    public void onChunkRenderUpdated(int x, int y, int z, ChunkRenderData meshBefore, ChunkRenderData meshAfter) {
-        ListUtil.updateList(this.globalBlockEntities, meshBefore.getGlobalBlockEntities(), meshAfter.getGlobalBlockEntities());
-
-        this.renderSectionManager.onChunkRenderUpdates(x, y, z, meshAfter);
-    }
-
     /**
      * Returns whether or not the entity intersects with any visible chunks in the graph.
+     *
      * @return True if the entity is visible, otherwise false
      */
     public boolean isEntityVisible(Entity entity) {
