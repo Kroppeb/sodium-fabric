@@ -2,11 +2,9 @@ package me.jellysquid.mods.sodium.client.render.chunk;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
@@ -41,7 +39,9 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkSection;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class RenderSectionManager implements ChunkStatusListener, SectionCuller.CullerInteractor {
@@ -57,7 +57,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     private final RenderSectionContainer renderSectionContainer;
     private final ClonedChunkSectionCache sectionCache;
 
-    private final Map<ChunkUpdateType, PriorityQueue<RenderSection>> rebuildQueues = new EnumMap<>(ChunkUpdateType.class);
+    private final PrioritizableBuilder prioritizableBuilder;
 
     private final ChunkAdjacencyMap adjacencyMap = new ChunkAdjacencyMap();
 
@@ -88,6 +88,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.world = world;
 
         this.builder = new ChunkBuilder(chunkRenderer.getVertexType());
+        this.prioritizableBuilder = new PrioritizableBuilder(this.builder, this::createRebuildTask);
         this.chunkRenderList = chunkRenderer.getChunkVisibilityListener();
         this.builder.init(world, renderPassManager);
 
@@ -96,10 +97,6 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         // todo: provide dynamically
         this.renderSectionContainer = renderSectionContainer;
         this.sectionCache = new ClonedChunkSectionCache(this.world);
-
-        for (ChunkUpdateType type : ChunkUpdateType.values()) {
-            this.rebuildQueues.put(type, new ObjectArrayFIFOQueue<>());
-        }
 
         this.culler = culler;
         this.culler.setCullerInteractor(this);
@@ -144,13 +141,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
             return;
         }
 
-        PriorityQueue<RenderSection> queue = this.rebuildQueues.get(section.getPendingUpdate());
-
-        if (queue.size() >= 32) {
-            return;
-        }
-
-        queue.enqueue(section);
+        this.prioritizableBuilder.schedulePendingUpdates(section);
     }
 
     @Override
@@ -175,9 +166,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     }
 
     private void resetLists() {
-        for (PriorityQueue<RenderSection> queue : this.rebuildQueues.values()) {
-            queue.clear();
-        }
+        this.prioritizableBuilder.clear();
 
         this.visibleBlockEntities.clear();
         this.chunkRenderList.clear();
@@ -264,10 +253,10 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     }
 
     public void updateChunks() {
-        PriorityQueue<CompletableFuture<ChunkBuildResult>> blockingFutures = this.submitRebuildTasks(ChunkUpdateType.IMPORTANT_REBUILD);
+        PriorityQueue<? extends CompletableFuture<? extends ChunkBuildResult>> blockingFutures = this.prioritizableBuilder.submitRebuildTasks(ChunkUpdateType.IMPORTANT_REBUILD);
 
-        this.submitRebuildTasks(ChunkUpdateType.INITIAL_BUILD);
-        this.submitRebuildTasks(ChunkUpdateType.REBUILD);
+        this.prioritizableBuilder.submitRebuildTasks(ChunkUpdateType.INITIAL_BUILD);
+        this.prioritizableBuilder.submitRebuildTasks(ChunkUpdateType.REBUILD);
 
         // Try to complete some other work on the main thread while we wait for rebuilds to complete
         this.needsUpdate |= this.performPendingUploads();
@@ -281,48 +270,10 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.renderSectionContainer.cleanup();
     }
 
-    private PriorityQueue<CompletableFuture<ChunkBuildResult>> submitRebuildTasks(ChunkUpdateType filterType) {
-        int budget = filterType.isImportant() ? Integer.MAX_VALUE : this.builder.getSchedulingBudget();
 
-        PriorityQueue<CompletableFuture<ChunkBuildResult>> immediateFutures = new ObjectArrayFIFOQueue<>();
-        PriorityQueue<RenderSection> queue = this.rebuildQueues.get(filterType);
-
-        while (budget > 0 && !queue.isEmpty()) {
-            RenderSection section = queue.dequeue();
-
-            if (section.isDisposed()) {
-                continue;
-            }
-
-            if (section.getPendingUpdate() != filterType) {
-                SodiumClientMod.logger().warn("{} changed update type to {} while in queue for {}, skipping",
-                        section, section.getPendingUpdate(), filterType);
-
-                continue;
-            }
-
-            ChunkRenderBuildTask task = this.createRebuildTask(section);
-            CompletableFuture<?> future;
-
-            if (filterType.isImportant()) {
-                CompletableFuture<ChunkBuildResult> immediateFuture = this.builder.schedule(task);
-                immediateFutures.enqueue(immediateFuture);
-
-                future = immediateFuture;
-            } else {
-                future = this.builder.scheduleDeferred(task);
-            }
-
-            section.onBuildSubmitted(future);
-
-            budget--;
-        }
-
-        return immediateFutures;
-    }
 
     private boolean performPendingUploads() {
-        Iterator<ChunkBuildResult> it = this.builder.createDeferredBuildResultDrain();
+        Iterator<? extends ChunkBuildResult> it = this.builder.createDeferredBuildResultDrain();
 
         if (!it.hasNext()) {
             return false;
@@ -333,7 +284,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         return true;
     }
 
-    public ChunkRenderBuildTask createRebuildTask(RenderSection render) {
+    private ChunkRenderBuildTask createRebuildTask(RenderSection render) {
         ChunkRenderContext context = WorldSlice.prepare(this.world, render.getChunkPos(), this.sectionCache);
         int frame = this.currentFrame;
 
@@ -390,7 +341,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.needsUpdate = true;
     }
 
-    public boolean isChunkPrioritized(RenderSection render) {
+    private boolean isChunkPrioritized(RenderSection render) {
         return render.getSquaredDistance(this.cameraX, this.cameraY, this.cameraZ) <= NEARBY_CHUNK_DISTANCE;
     }
 
@@ -400,7 +351,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.onChunkRenderUpdates(x, y, z, meshAfter);
     }
 
-    public void onChunkRenderUpdates(int x, int y, int z, ChunkRenderData data) {
+    private void onChunkRenderUpdates(int x, int y, int z, ChunkRenderData data) {
         RenderSection node = this.getRenderSection(x, y, z);
 
         if (node != null) {

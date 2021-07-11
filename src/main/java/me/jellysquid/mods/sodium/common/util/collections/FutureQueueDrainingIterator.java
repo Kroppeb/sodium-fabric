@@ -9,30 +9,30 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 public class FutureQueueDrainingIterator<T> implements Iterator<T> {
-    private final PriorityQueue<CompletableFuture<T>> queue;
+    private final PriorityQueue<? extends CompletableFuture<? extends T>> queue;
     private T next = null;
 
-    public FutureQueueDrainingIterator(PriorityQueue<CompletableFuture<T>> queue) {
+    public FutureQueueDrainingIterator(PriorityQueue<? extends CompletableFuture<? extends T>> queue) {
         this.queue = queue;
     }
 
     @Override
     public boolean hasNext() {
-        if (next != null) {
+        if (this.next != null) {
             return true;
         }
 
-        findNext();
+        this.findNext();
 
-        return next != null;
+        return this.next != null;
     }
 
     private void findNext() {
-        while (!queue.isEmpty()) {
-            CompletableFuture<T> future = queue.dequeue();
+        while (!this.queue.isEmpty()) {
+            CompletableFuture<? extends T> future = this.queue.dequeue();
 
             try {
-                next = future.join();
+                this.next = future.join();
                 return;
             } catch (CancellationException e) {
                 SodiumClientMod.logger().warn("Future was cancelled: {}", future);
@@ -42,12 +42,12 @@ public class FutureQueueDrainingIterator<T> implements Iterator<T> {
 
     @Override
     public T next() {
-        if (!hasNext()) {
+        if (!this.hasNext()) {
             throw new NoSuchElementException();
         }
 
-        T result = next;
-        next = null;
+        T result = this.next;
+        this.next = null;
 
         return result;
     }

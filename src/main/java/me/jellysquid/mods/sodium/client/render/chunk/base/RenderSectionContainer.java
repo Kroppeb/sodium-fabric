@@ -9,6 +9,10 @@ import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import java.util.Collection;
 import java.util.Iterator;
 
+/**
+ * The RenderSectionContainer is responsible for managing (or delegating) the tracking of {@link RenderSection} and
+ * their resources
+ */
 public interface RenderSectionContainer extends SectionCuller.FrustumChecker {
     // TODO: figure out why this doesn't need the camera
     void updateVisibility(FrustumExtended frustum);

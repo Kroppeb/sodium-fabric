@@ -17,6 +17,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ *
+ */
 public class ChunkBuilder {
     /**
      * The maximum number of jobs that can be queued for a given worker thread.
@@ -57,7 +60,7 @@ public class ChunkBuilder {
      * Spawns a number of work-stealing threads to process results in the build queue. If the builder is already
      * running, this method does nothing and exits.
      */
-    public void startWorkers() {
+    private void startWorkers() {
         if (this.running.getAndSet(true)) {
             return;
         }
@@ -132,7 +135,7 @@ public class ChunkBuilder {
         this.world = null;
     }
 
-    public CompletableFuture<ChunkBuildResult> schedule(ChunkRenderBuildTask task) {
+    public CompletableFuture<? extends ChunkBuildResult> schedule(ChunkRenderBuildTask task) {
         if (!this.running.get()) {
             throw new IllegalStateException("Executor is stopped");
         }
@@ -183,12 +186,12 @@ public class ChunkBuilder {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
-    public CompletableFuture<Void> scheduleDeferred(ChunkRenderBuildTask task) {
+    public CompletableFuture<?> scheduleDeferred(ChunkRenderBuildTask task) {
         return this.schedule(task)
                 .thenAccept(this.deferredResultQueue::add);
     }
 
-    public Iterator<ChunkBuildResult> createDeferredBuildResultDrain() {
+    public Iterator<? extends ChunkBuildResult> createDeferredBuildResultDrain() {
         return new QueueDrainingIterator<>(this.deferredResultQueue);
     }
 
