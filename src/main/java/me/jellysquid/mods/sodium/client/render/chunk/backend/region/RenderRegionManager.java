@@ -1,23 +1,24 @@
-package me.jellysquid.mods.sodium.client.render.chunk.region;
+package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
+import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;
 import me.jellysquid.mods.sodium.client.gl.buffer.IndexedVertexData;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
-import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
-import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSection;
+import me.jellysquid.mods.sodium.client.render.chunk.*;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkMeshData;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
+import net.minecraft.util.math.ChunkSectionPos;
 
 import java.util.*;
 
-public class RenderRegionManager {
+public class RenderRegionManager implements RenderSectionContainer {
     private final Long2ReferenceOpenHashMap<RenderRegion> regions = new Long2ReferenceOpenHashMap<>();
+    private final Long2ReferenceMap<RenderSection> sections = new Long2ReferenceOpenHashMap<>();
 
     private final ChunkRenderer renderer;
 
@@ -54,7 +55,7 @@ public class RenderRegionManager {
         }
     }
 
-    public void upload(CommandList commandList, Iterator<ChunkBuildResult> queue) {
+    public void upload(CommandList commandList, Iterator<? extends ChunkBuildResult> queue) {
         for (Map.Entry<RenderRegion, List<ChunkBuildResult>> entry : this.setupUploadBatches(queue).entrySet()) {
             RenderRegion region = entry.getKey();
             List<ChunkBuildResult> uploadQueue = entry.getValue();
@@ -116,7 +117,7 @@ public class RenderRegionManager {
         }
     }
 
-    private Map<RenderRegion, List<ChunkBuildResult>> setupUploadBatches(Iterator<ChunkBuildResult> renders) {
+    private Map<RenderRegion, List<ChunkBuildResult>> setupUploadBatches(Iterator<? extends ChunkBuildResult> renders) {
         Map<RenderRegion, List<ChunkBuildResult>> map = new Reference2ObjectLinkedOpenHashMap<>();
 
         while (renders.hasNext()) {
@@ -180,5 +181,86 @@ public class RenderRegionManager {
             this.vertexUpload = vertexUpload;
             this.indicesUpload = indicesUpload;
         }
+    }
+
+    @Override
+    public RenderSection createSection(RenderSectionManager renderSectionManager, int x, int y, int z) {
+
+        // Get region for the render section
+        RenderRegion region = this.createRegionForChunk(x, y, z);
+
+        // add new render section to the region
+        RenderSection renderSection = new RenderSection(renderSectionManager, x, y, z, region);
+        region.addChunk(renderSection);
+
+        // store a direct lookup to the render section
+        this.sections.put(ChunkSectionPos.asLong(x, y, z), renderSection);
+
+        return renderSection;
+    }
+
+    @Override
+    public RenderSection remove(int x, int y, int z) {
+        RenderSection section = this.sections.remove(ChunkSectionPos.asLong(x, y, z));
+
+        if(section!= null){
+            RenderRegion region = section.getRegion();
+            region.removeChunk(section);
+        }
+
+        return section;
+    }
+
+    @Override
+    public RenderSection get(int x, int y, int z) {
+        return this.sections.get(ChunkSectionPos.asLong(x, y, z));
+    }
+
+    @Override
+    public int getTotalSectionCount() {
+        int sum = 0;
+
+        for (RenderRegion renderRegion : this.regions.values()) {
+            int chunkCount = renderRegion.getChunkCount();
+            sum += chunkCount;
+        }
+
+        return sum;
+    }
+
+    @Override
+    public Collection<? extends String> getMemoryDebugStrings() {
+        List<String> list = new ArrayList<>();
+
+        Iterator<RenderRegion.RenderRegionArenas> it = this.regions.values()
+                .stream()
+                .flatMap(i -> Arrays.stream(BlockRenderPass.values())
+                        .map(i::getArenas))
+                .filter(Objects::nonNull)
+                .iterator();
+
+        int count = 0;
+
+        long used = 0;
+        long allocated = 0;
+
+        while (it.hasNext()) {
+            RenderRegion.RenderRegionArenas arena = it.next();
+            used += arena.getUsedMemory();
+            allocated += arena.getAllocatedMemory();
+
+            count++;
+        }
+
+        String format = String.format("Chunk Arenas: %d/%d MiB (%d buffers)", toMib(used), toMib(allocated), count);
+        list.add(format);
+
+        return list;
+
+    }
+
+    // TODO make util function
+    private static long toMib(long x) {
+        return x / 1024L / 1024L;
     }
 }

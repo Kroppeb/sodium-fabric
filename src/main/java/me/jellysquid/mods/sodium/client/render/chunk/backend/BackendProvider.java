@@ -4,6 +4,7 @@ import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.Culler;
+import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionContainer;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.backend.advanced.AdvancedBackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RegionBackendProvider;
@@ -15,7 +16,6 @@ public interface BackendProvider {
     boolean isSupported(SodiumGameOptions options);
 
 
-
     static BackendProvider getBackend(SodiumGameOptions options) {
         if (AdvancedBackendProvider.INSTANCE.isSupported(options)) {
             return AdvancedBackendProvider.INSTANCE;
@@ -25,13 +25,18 @@ public interface BackendProvider {
     }
 
     ChunkRenderer createChunkRenderer(RenderDevice device, ModelVertexType vertexType);
+
     Culler createCuller(
             ClientWorld world,
             int renderDistance
     );
+
+    RenderSectionContainer createRenderSectionContainer(ChunkRenderer chunkRenderer);
+
     RenderSectionManager createRenderSectionManager(
             ChunkRenderer chunkRenderer,
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
-            Culler culler);
+            Culler culler,
+            RenderSectionContainer renderSectionContainer);
 }

@@ -1,7 +1,7 @@
 package me.jellysquid.mods.sodium.client.render.chunk;
 
 import it.unimi.dsi.fastutil.objects.*;
-import me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegion;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RenderRegion;
 
 import java.util.Collections;
 import java.util.Iterator;

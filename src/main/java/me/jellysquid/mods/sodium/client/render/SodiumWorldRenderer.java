@@ -9,7 +9,6 @@ import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkModelVertexFormats;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
-import me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegion;
 import me.jellysquid.mods.sodium.client.render.pipeline.context.ChunkRenderCacheShared;
 import me.jellysquid.mods.sodium.client.util.NativeBuffer;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
@@ -250,7 +249,9 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         this.renderSectionManager = backendProvider.createRenderSectionManager(
                 this.chunkRenderer,
                 this.renderPassManager,
-                this.world, backendProvider.createCuller(this.world, this.renderDistance));
+                this.world,
+                backendProvider.createCuller(this.world, this.renderDistance),
+                backendProvider.createRenderSectionContainer(this.chunkRenderer));
         this.renderSectionManager.loadChunks();
     }
 
@@ -395,32 +396,8 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
         return this.chunkRenderer;
     }
 
-    public Collection<String> getMemoryDebugStrings() {
-        List<String> list = new ArrayList<>();
-
-        Iterator<RenderRegion.RenderRegionArenas> it = this.renderSectionManager.getRegions()
-                .stream()
-                .flatMap(i -> Arrays.stream(BlockRenderPass.values())
-                        .map(i::getArenas))
-                .filter(Objects::nonNull)
-                .iterator();
-
-        int count = 0;
-
-        long used = 0;
-        long allocated = 0;
-
-        while (it.hasNext()) {
-            RenderRegion.RenderRegionArenas arena = it.next();
-            used += arena.getUsedMemory();
-            allocated += arena.getAllocatedMemory();
-
-            count++;
-        }
-
-        list.add(String.format("Chunk Arenas: %d/%d MiB (%d buffers)", toMib(used), toMib(allocated), count));
-
-        return list;
+    public Collection<? extends String> getMemoryDebugStrings() {
+        return this.renderSectionManager.getRenderSectionContainer().getMemoryDebugStrings();
     }
 
     private static long toMib(long x) {

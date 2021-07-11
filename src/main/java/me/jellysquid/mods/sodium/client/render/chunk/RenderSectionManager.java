@@ -1,8 +1,6 @@
 package me.jellysquid.mods.sodium.client.render.chunk;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -16,8 +14,6 @@ import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuilder;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
-import me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegion;
-import me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderBuildTask;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderEmptyBuildTask;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderRebuildTask;
@@ -54,10 +50,8 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
     private final ChunkBuilder builder;
     private final ChunkRenderer chunkRenderer;
 
-    private final RenderRegionManager regions;
+    private final RenderSectionContainer renderSectionContainer;
     private final ClonedChunkSectionCache sectionCache;
-
-    private final Long2ReferenceMap<RenderSection> sections = new Long2ReferenceOpenHashMap<>();
 
     private final Map<ChunkUpdateType, PriorityQueue<RenderSection>> rebuildQueues = new EnumMap<>(ChunkUpdateType.class);
 
@@ -84,7 +78,8 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
             ChunkRenderer chunkRenderer,
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
-            Culler culler
+            Culler culler,
+            RenderSectionContainer renderSectionContainer
     ) {
         this.chunkRenderer = chunkRenderer;
         this.world = world;
@@ -94,7 +89,8 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
 
         this.needsUpdate = true;
 
-        this.regions = new RenderRegionManager(this.chunkRenderer);
+        // todo: provide dynamically
+        this.renderSectionContainer = renderSectionContainer;
         this.sectionCache = new ClonedChunkSectionCache(this.world);
 
         for (ChunkUpdateType type : ChunkUpdateType.values()) {
@@ -120,7 +116,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
     public void update(Camera camera, FrustumExtended frustum, int frame, boolean spectator) {
         this.resetLists();
 
-        this.regions.updateVisibility(frustum);
+        this.renderSectionContainer.updateVisibility(frustum);
 
         this.setup(camera);
         this.culler.setup(camera);
@@ -206,12 +202,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
     }
 
     private boolean loadSection(int x, int y, int z) {
-        RenderRegion region = this.regions.createRegionForChunk(x, y, z);
-
-        RenderSection render = new RenderSection(this, x, y, z, region);
-        region.addChunk(render);
-
-        this.sections.put(ChunkSectionPos.asLong(x, y, z), render);
+        RenderSection render = this.renderSectionContainer.createSection(this, x, y, z);
 
         Chunk chunk = this.world.getChunk(x, z);
         ChunkSection section = chunk.getSectionArray()[this.world.sectionCoordToIndex(y)];
@@ -228,7 +219,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
     }
 
     private boolean unloadSection(int x, int y, int z) {
-        RenderSection chunk = this.sections.remove(ChunkSectionPos.asLong(x, y, z));
+        RenderSection chunk = this.renderSectionContainer.remove(x, y, z);
 
         if (chunk == null) {
             throw new IllegalStateException("Chunk is not loaded: " + ChunkSectionPos.asLong(x, y, z));
@@ -237,9 +228,6 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
         chunk.delete();
 
         this.disconnectNeighborNodes(chunk);
-
-        RenderRegion region = chunk.getRegion();
-        region.removeChunk(chunk);
 
         return true;
     }
@@ -280,10 +268,12 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
         this.needsUpdate |= this.performPendingUploads();
 
         if (!blockingFutures.isEmpty()) {
-            this.regions.upload(RenderDevice.INSTANCE.createCommandList(), new FutureQueueDrainingIterator<>(blockingFutures));
+            this.renderSectionContainer.upload(
+                    RenderDevice.INSTANCE.createCommandList(),
+                    new FutureQueueDrainingIterator<>(blockingFutures));
         }
 
-        this.regions.cleanup();
+        this.renderSectionContainer.cleanup();
     }
 
     private PriorityQueue<CompletableFuture<ChunkBuildResult>> submitRebuildTasks(ChunkUpdateType filterType) {
@@ -333,7 +323,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
             return false;
         }
 
-        this.regions.upload(RenderDevice.INSTANCE.createCommandList(), it);
+        this.renderSectionContainer.upload(RenderDevice.INSTANCE.createCommandList(), it);
 
         return true;
     }
@@ -365,20 +355,14 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
         this.resetLists();
 
         try (CommandList commandList = RenderDevice.INSTANCE.createCommandList()) {
-            this.regions.delete(commandList);
+            this.renderSectionContainer.delete(commandList);
         }
 
         this.builder.stopWorkers();
     }
 
     public int getTotalSections() {
-        int sum = 0;
-
-        for (RenderRegion region : this.regions.getLoadedRegions()) {
-            sum += region.getChunkCount();
-        }
-
-        return sum;
+        return this.renderSectionContainer.getTotalSectionCount();
     }
 
     public int getVisibleChunkCount() {
@@ -388,7 +372,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
     public void scheduleRebuild(int x, int y, int z, boolean important) {
         this.sectionCache.invalidate(x, y, z);
 
-        RenderSection section = this.sections.get(ChunkSectionPos.asLong(x, y, z));
+        RenderSection section = this.renderSectionContainer.get(x, y, z);
 
         if (section != null && section.isBuilt()) {
             if (important || this.isChunkPrioritized(section)) {
@@ -445,11 +429,11 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
     }
 
     private RenderSection getRenderSection(int x, int y, int z) {
-        return this.sections.get(ChunkSectionPos.asLong(x, y, z));
+        return this.renderSectionContainer.get(x, y, z);
     }
 
-    public Collection<? extends RenderRegion> getRegions() {
-        return this.regions.getLoadedRegions();
+    public RenderSectionContainer getRenderSectionContainer() {
+        return this.renderSectionContainer;
     }
 
     public Set<? extends BlockEntity> getGlobalBlockEntities() {

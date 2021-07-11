@@ -1,4 +1,4 @@
-package me.jellysquid.mods.sodium.client.render.chunk.region;
+package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;

@@ -4,6 +4,7 @@ import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.Culler;
+import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionContainer;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.format.sfp.ModelVertexType;
@@ -32,7 +33,12 @@ public final class AdvancedBackendProvider implements BackendProvider {
     }
 
     @Override
-    public RenderSectionManager createRenderSectionManager(ChunkRenderer chunkRenderer, BlockRenderPassManager renderPassManager, ClientWorld world, Culler culler) {
+    public RenderSectionContainer createRenderSectionContainer(ChunkRenderer chunkRenderer) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public RenderSectionManager createRenderSectionManager(ChunkRenderer chunkRenderer, BlockRenderPassManager renderPassManager, ClientWorld world, Culler culler, RenderSectionContainer renderSectionContainer) {
         throw new UnsupportedOperationException();
     }
 }

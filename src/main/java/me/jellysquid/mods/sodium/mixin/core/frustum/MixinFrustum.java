@@ -1,6 +1,6 @@
 package me.jellysquid.mods.sodium.mixin.core.frustum;
 
-import me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegionVisibility;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RenderRegionVisibility;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.util.math.Matrix4f;

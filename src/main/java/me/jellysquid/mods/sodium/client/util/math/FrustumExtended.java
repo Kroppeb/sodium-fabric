@@ -1,6 +1,6 @@
 package me.jellysquid.mods.sodium.client.util.math;
 
-import me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegionVisibility;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RenderRegionVisibility;
 
 public interface FrustumExtended {
     boolean fastAabbTest(float minX, float minY, float minZ, float maxX, float maxY, float maxZ);

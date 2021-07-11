@@ -30,7 +30,12 @@ public final class RegionBackendProvider implements BackendProvider {
     }
 
     @Override
-    public RenderSectionManager createRenderSectionManager(ChunkRenderer chunkRenderer, BlockRenderPassManager renderPassManager, ClientWorld world, Culler culler) {
-        return new RenderSectionManager(chunkRenderer, renderPassManager, world, culler);
+    public RenderSectionContainer createRenderSectionContainer(ChunkRenderer chunkRenderer) {
+        return new RenderRegionManager(chunkRenderer);
+    }
+
+    @Override
+    public RenderSectionManager createRenderSectionManager(ChunkRenderer chunkRenderer, BlockRenderPassManager renderPassManager, ClientWorld world, Culler culler, RenderSectionContainer renderSectionContainer) {
+        return new RenderSectionManager(chunkRenderer, renderPassManager, world, culler, renderSectionContainer);
     }
 }
