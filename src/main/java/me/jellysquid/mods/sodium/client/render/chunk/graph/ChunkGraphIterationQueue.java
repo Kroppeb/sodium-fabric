@@ -40,7 +40,7 @@ public class ChunkGraphIterationQueue {
         this.directions = Arrays.copyOf(this.directions, this.capacity);
     }
 
-    public ChunkGraphInfo getRender(int i) {
+    public ChunkGraphInfo getSection(int i) {
         return this.sections[i];
     }
 

@@ -10,18 +10,13 @@ import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.SectionCuller;
-import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
-import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
-import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
+import me.jellysquid.mods.sodium.client.render.chunk.base.*;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkMeshData;
 import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
-import me.jellysquid.mods.sodium.common.util.DirectionUtil;
 import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.Direction;
 
 import java.util.*;
 
@@ -92,7 +87,6 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
 
             for (ChunkBuildResult result : uploadQueue) {
                 result.render.onBuildFinished(result);
-
                 result.delete();
             }
         }
@@ -226,22 +220,8 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
 
         // store a direct lookup to the render section
         this.sections.put(ChunkSectionPos.asLong(x, y, z), renderSection);
-        this.connectNeighborNodes(renderSection);
 
         return renderSection;
-    }
-
-    private void connectNeighborNodes(RenderSection render) {
-        for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
-            RenderSection adj = this.get(render.getChunkX() + dir.getOffsetX(),
-                    render.getChunkY() + dir.getOffsetY(),
-                    render.getChunkZ() + dir.getOffsetZ());
-
-            if (adj != null) {
-                adj.setAdjacentNode(DirectionUtil.getOpposite(dir), render);
-                render.setAdjacentNode(dir, adj);
-            }
-        }
     }
 
     @Override
@@ -253,6 +233,7 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
             // Shouldn't be null
             RenderRegion region = this.getRenderRegionForChunkSection(x, y, z);
             region.removeChunk(section);
+
 
             section.delete();
         }

@@ -7,10 +7,7 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
-import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkVisibilityListener;
-import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
-import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
+import me.jellysquid.mods.sodium.client.render.chunk.base.*;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuilder;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
@@ -67,6 +64,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     private final Set<BlockEntity> globalBlockEntities = new ObjectOpenHashSet<>();
 
     private final ClientWorld world;
+    private final SectionListener cullerSectionListener;
 
     private float cameraX, cameraY, cameraZ;
 
@@ -99,6 +97,8 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.culler = culler;
         this.culler.setCullerInteractor(this);
         this.culler.setFrustumChecker(renderSectionContainer);
+
+        this.cullerSectionListener = this.culler.getListener();
     }
 
     public void loadChunks() {
@@ -194,26 +194,30 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     }
 
     private boolean loadSection(int x, int y, int z) {
-        RenderSection render = this.renderSectionContainer.createSection(this, x, y, z);
+        RenderSection renderSection = this.renderSectionContainer.createSection(this, x, y, z);
+
+        this.cullerSectionListener.addSection(renderSection);
 
         Chunk chunk = this.world.getChunk(x, z);
         ChunkSection section = chunk.getSectionArray()[this.world.sectionCoordToIndex(y)];
 
         if (ChunkSection.isEmpty(section)) {
-            render.setData(ChunkRenderData.EMPTY);
+            renderSection.setData(ChunkRenderData.EMPTY);
         } else {
-            render.markForUpdate(ChunkUpdateType.INITIAL_BUILD);
+            renderSection.markForUpdate(ChunkUpdateType.INITIAL_BUILD);
         }
 
         return true;
     }
 
     private boolean unloadSection(int x, int y, int z) {
-        RenderSection chunk = this.renderSectionContainer.remove(x, y, z);
+        RenderSection renderSection = this.renderSectionContainer.remove(x, y, z);
 
-        if (chunk == null) {
+        if (renderSection == null) {
             throw new IllegalStateException("Chunk is not loaded: " + ChunkSectionPos.asLong(x, y, z));
         }
+
+        this.cullerSectionListener.removeSection(renderSection);
 
         return true;
     }
@@ -234,14 +238,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     }
 
     public boolean isSectionVisible(int x, int y, int z) {
-        RenderSection render = this.getRenderSection(x, y, z);
-
-        if (render == null) {
-            return false;
-        }
-
-        return render.getGraphInfo()
-                .getLastVisibleFrame() == this.currentFrame;
+        return this.culler.isSectionVisible(x,y,z, this.currentFrame);
     }
 
     public void updateChunks() {
@@ -347,7 +344,8 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         RenderSection node = this.getRenderSection(x, y, z);
 
         if (node != null) {
-            node.setOcclusionData(data.getOcclusionData());
+            // todo: can this ever be not null?
+            this.cullerSectionListener.updateSection(node);
         }
     }
 

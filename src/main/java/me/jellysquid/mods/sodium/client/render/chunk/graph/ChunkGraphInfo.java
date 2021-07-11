@@ -5,20 +5,23 @@ import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
 import net.minecraft.client.render.chunk.ChunkOcclusionData;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 
 public class ChunkGraphInfo {
     private static final long DEFAULT_VISIBILITY_DATA = calculateVisibilityData(ChunkRenderData.EMPTY.getOcclusionData());
 
-    private final RenderSection parent;
+    private final RenderSection renderSection;
 
     private int lastVisibleFrame = -1;
 
     private long visibilityData;
     private byte cullingState;
 
-    public ChunkGraphInfo(RenderSection parent) {
-        this.parent = parent;
+    private final ChunkGraphInfo[] adjacent = new ChunkGraphInfo[DirectionUtil.ALL_DIRECTIONS.length];
+
+    public ChunkGraphInfo(RenderSection renderSection) {
+        this.renderSection = renderSection;
         this.visibilityData = DEFAULT_VISIBILITY_DATA;
     }
 
@@ -98,27 +101,49 @@ public class ChunkGraphInfo {
     }
 
     public RenderSection getRenderSection() {
-        return this.parent;
-    }
-
-    public final ChunkGraphInfo getAdjacent(Direction dir) {
-        // TODO move adjacency from renders to graph info
-        RenderSection adjacent = this.parent.getAdjacent(dir);
-        if (adjacent == null) {
-            return null;
-        }
-        return adjacent.getGraphInfo();
+        return this.renderSection;
     }
 
     public int getChunkX() {
-        return this.parent.getChunkX();
+        return this.renderSection.getChunkX();
     }
 
     public int getChunkY() {
-        return this.parent.getChunkY();
+        return this.renderSection.getChunkY();
     }
 
     public int getChunkZ() {
-        return this.parent.getChunkZ();
+        return this.renderSection.getChunkZ();
+    }
+
+
+    public ChunkGraphInfo getAdjacent(Direction dir) {
+        return this.adjacent[dir.ordinal()];
+    }
+
+    private void disconnectNeighborNodes() {
+        for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
+            ChunkGraphInfo adj = this.getAdjacent(dir);
+
+            if (adj != null) {
+                adj.setAdjacentNode(DirectionUtil.getOpposite(dir), null);
+
+                // TODO: Is this really needed?
+                this.setAdjacentNode(dir, null);
+            }
+        }
+    }
+
+
+    public void setAdjacentNode(Direction dir, ChunkGraphInfo node) {
+        this.adjacent[dir.ordinal()] = node;
+    }
+
+    public double getSquaredDistance(BlockPos origin) {
+        return this.renderSection.getSquaredDistance(origin);
+    }
+
+    public void delete() {
+        this.disconnectNeighborNodes();
     }
 }

@@ -2,7 +2,9 @@ package me.jellysquid.mods.sodium.client.render.chunk;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
+import me.jellysquid.mods.sodium.client.render.chunk.base.Culler;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
+import me.jellysquid.mods.sodium.client.render.chunk.base.SectionListener;
 import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphIterationQueue;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
@@ -55,6 +57,8 @@ public class SectionCuller implements Culler {
 
     private double fogRenderCutoff;
 
+    private final ChunkGraphInfoManager chunkGraphInfoManager = new ChunkGraphInfoManager();
+
     public SectionCuller(ClientWorld world, int renderDistance) {
         this.world = world;
         this.renderDistance = renderDistance;
@@ -68,6 +72,17 @@ public class SectionCuller implements Culler {
     @Override
     public void setFrustumChecker(FrustumChecker frustumChecker) {
         this.frustumChecker = frustumChecker;
+    }
+
+    @Override
+    public SectionListener getListener() {
+        return this.chunkGraphInfoManager;
+    }
+
+    @Override
+    public boolean isSectionVisible(int x, int y, int z, int currentFrame) {
+        ChunkGraphInfo chunkGraphInfo = this.chunkGraphInfoManager.get(x, y, z);
+        return (chunkGraphInfo != null) && chunkGraphInfo.getLastVisibleFrame() == currentFrame;
     }
 
     @Override
@@ -97,7 +112,7 @@ public class SectionCuller implements Culler {
         ChunkGraphIterationQueue queue = this.iterationQueue;
 
         for (int i = 0; i < queue.size(); i++) {
-            ChunkGraphInfo section = queue.getRender(i);
+            ChunkGraphInfo section = queue.getSection(i);
             Direction flow = queue.getDirection(i);
 
             // TODO: @Kroppeb understand what this does
@@ -149,10 +164,9 @@ public class SectionCuller implements Culler {
         this.centerChunkX = chunkX;
         this.centerChunkZ = chunkZ;
 
-        RenderSection rootRender = this.cullerInteractor.resolveSection(chunkX, chunkY, chunkZ);
+        ChunkGraphInfo rootInfo = this.chunkGraphInfoManager.get(chunkX, chunkY, chunkZ);
 
-        if (rootRender != null) {
-            ChunkGraphInfo rootInfo = rootRender.getGraphInfo();
+        if (rootInfo != null) {
             rootInfo.resetCullingState();
             rootInfo.setLastVisibleFrame(frame);
 
@@ -160,37 +174,35 @@ public class SectionCuller implements Culler {
                 this.useOcclusionCulling = false;
             }
 
-            this.addVisible(rootRender.getGraphInfo(), null);
+            this.addVisible(rootInfo, null);
         } else {
             chunkY = MathHelper.clamp(origin.getY() >> 4, this.world.getBottomSectionCoord(), this.world.getTopSectionCoord() - 1);
 
-            List<RenderSection> sorted = new ArrayList<>();
+            List<ChunkGraphInfo> sorted = new ArrayList<>();
 
             for (int x2 = -this.renderDistance; x2 <= this.renderDistance; ++x2) {
                 for (int z2 = -this.renderDistance; z2 <= this.renderDistance; ++z2) {
-                    RenderSection render = this.cullerInteractor.resolveSection(chunkX + x2, chunkY, chunkZ + z2);
+                    ChunkGraphInfo section = this.chunkGraphInfoManager.get(chunkX + x2, chunkY, chunkZ + z2);
 
-                    if (render == null) {
+                    if (section == null) {
                         continue;
                     }
 
-                    ChunkGraphInfo info = render.getGraphInfo();
-
-                    if (info.isCulledByFrustum(frustum)) {
+                    if (section.isCulledByFrustum(frustum)) {
                         continue;
                     }
 
-                    info.resetCullingState();
-                    info.setLastVisibleFrame(frame);
+                    section.resetCullingState();
+                    section.setLastVisibleFrame(frame);
 
-                    sorted.add(render);
+                    sorted.add(section);
                 }
             }
 
             sorted.sort(Comparator.comparingDouble(node -> node.getSquaredDistance(origin)));
 
-            for (RenderSection render : sorted) {
-                this.addVisible(render.getGraphInfo(), null);
+            for (ChunkGraphInfo info : sorted) {
+                this.addVisible(info, null);
             }
         }
     }

@@ -4,17 +4,13 @@ import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkUpdateType;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
-import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.texture.SpriteUtil;
-import me.jellysquid.mods.sodium.common.util.DirectionUtil;
-import net.minecraft.client.render.chunk.ChunkOcclusionData;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.Direction;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -29,10 +25,6 @@ public class RenderSection {
     private final int chunkX, chunkY, chunkZ;
 
     private final Map<BlockRenderPass, ChunkGraphicsState> graphicsStates;
-    @Deprecated
-    private final ChunkGraphInfo graphInfo;
-
-    private final RenderSection[] adjacent = new RenderSection[DirectionUtil.ALL_DIRECTIONS.length];
 
     private ChunkRenderData data = ChunkRenderData.ABSENT;
     private CompletableFuture<?> rebuildTask = null;
@@ -51,38 +43,16 @@ public class RenderSection {
         this.chunkY = chunkY;
         this.chunkZ = chunkZ;
 
-        this.graphInfo = new ChunkGraphInfo(this);
-
         this.graphicsStates = new EnumMap<>(BlockRenderPass.class);
     }
 
 
-    public RenderSection getAdjacent(Direction dir) {
-        return this.adjacent[dir.ordinal()];
-    }
-
-    private void disconnectNeighborNodes() {
-        for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
-            RenderSection adj = this.getAdjacent(dir);
-
-            if (adj != null) {
-                adj.setAdjacentNode(DirectionUtil.getOpposite(dir), null);
-
-                // TODO: Is this really needed?
-                this.setAdjacentNode(dir, null);
-            }
-        }
-    }
-
-    public void setAdjacentNode(Direction dir, RenderSection node) {
-        this.adjacent[dir.ordinal()] = node;
-    }
 
     /**
      * Cancels any pending tasks to rebuild the chunk. If the result of any pending tasks has not been processed yet,
      * those will also be discarded when processing finally happens.
      */
-    public void cancelRebuildTask() {
+    private void cancelRebuildTask() {
         if (this.rebuildTask != null) {
             this.rebuildTask.cancel(false);
             this.rebuildTask = null;
@@ -104,7 +74,6 @@ public class RenderSection {
         this.deleteGraphicsState();
 
         this.disposed = true;
-        this.disconnectNeighborNodes();
     }
 
     private void deleteGraphicsState() {
@@ -120,8 +89,9 @@ public class RenderSection {
             throw new NullPointerException("Mesh information must not be null");
         }
 
-        this.renderSectionManager.onChunkRenderUpdated(this.chunkX, this.chunkY, this.chunkZ, this.data, info);
+        ChunkRenderData old = this.data;
         this.data = info;
+        this.renderSectionManager.onChunkRenderUpdated(this.chunkX, this.chunkY, this.chunkZ, old, info);
 
         this.tickable = !info.getAnimatedSprites().isEmpty();
     }
@@ -138,6 +108,13 @@ public class RenderSection {
      */
     public ChunkSectionPos getChunkPos() {
         return ChunkSectionPos.from(this.chunkX, this.chunkY, this.chunkZ);
+    }
+
+    /**
+     * Returns the chunk section position which this render refers to in the world.
+     */
+    public long getChunkPosAsLong() {
+        return ChunkSectionPos.asLong(this.chunkX, this.chunkY, this.chunkZ);
     }
 
     /**
@@ -261,16 +238,6 @@ public class RenderSection {
     public String toString() {
         return String.format("RenderChunk{chunkX=%d, chunkY=%d, chunkZ=%d}",
                 this.chunkX, this.chunkY, this.chunkZ);
-    }
-
-    @Deprecated
-    public ChunkGraphInfo getGraphInfo() {
-        return this.graphInfo;
-    }
-
-    @Deprecated
-    public void setOcclusionData(ChunkOcclusionData occlusionData) {
-        this.graphInfo.setOcclusionData(occlusionData);
     }
 
     public ChunkUpdateType getPendingUpdate() {
