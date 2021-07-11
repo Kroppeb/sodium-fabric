@@ -14,6 +14,7 @@ import me.jellysquid.mods.sodium.client.gl.util.ElementRange;
 import me.jellysquid.mods.sodium.client.gl.util.MultiDrawBatch;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RegionalChunkRenderList;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkMeshAttribute;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
@@ -90,16 +91,16 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
             RenderRegion region = entry.getKey();
             List<RenderSection> regionSections = entry.getValue();
 
-            MultiDrawBatch batch = buildDrawBatches(regionSections, pass, camera);
+            MultiDrawBatch batch = this.buildDrawBatches(regionSections, pass, camera);
 
             if (batch == null) {
                 continue;
             }
 
-            pushCameraTranslation(region, camera);
+            this.pushCameraTranslation(region, camera);
 
-            GlTessellation tessellation = createTessellation(commandList, region.getArenas(pass));
-            executeDrawBatch(commandList, tessellation, this.batch);
+            GlTessellation tessellation = this.createTessellation(commandList, region.getArenas(pass));
+            this.executeDrawBatch(commandList, tessellation, this.batch);
         }
         
         super.end();
@@ -216,7 +217,8 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
     }
 
     private static Iterable<Map.Entry<RenderRegion, List<RenderSection>>> sortedRegions(ChunkRenderList list, boolean translucent) {
-        return list.sorted(translucent);
+        // TODO fix ugly cast
+        return ((RegionalChunkRenderList) list).sorted(translucent);
     }
 
     private static Iterable<RenderSection> sortedChunks(List<RenderSection> chunks, boolean translucent) {

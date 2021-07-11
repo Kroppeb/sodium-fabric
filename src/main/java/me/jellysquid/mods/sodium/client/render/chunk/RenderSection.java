@@ -27,8 +27,6 @@ public class RenderSection {
     private final int chunkX, chunkY, chunkZ;
 
     private final Map<BlockRenderPass, ChunkGraphicsState> graphicsStates;
-    @Deprecated
-    private final RenderRegion region;
     private final ChunkGraphInfo graphInfo;
 
     private final RenderSection[] adjacent = new RenderSection[DirectionUtil.ALL_DIRECTIONS.length];
@@ -43,9 +41,8 @@ public class RenderSection {
 
     private int lastAcceptedBuildTime = -1;
 
-    public RenderSection(RenderSectionManager renderSectionManager, int chunkX, int chunkY, int chunkZ, RenderRegion region) {
+    public RenderSection(RenderSectionManager renderSectionManager, int chunkX, int chunkY, int chunkZ) {
         this.renderSectionManager = renderSectionManager;
-        this.region = region;
 
         this.chunkX = chunkX;
         this.chunkY = chunkY;
@@ -237,11 +234,6 @@ public class RenderSection {
 
     public boolean isTickable() {
         return this.tickable;
-    }
-
-    @Deprecated
-    public RenderRegion getRegion() {
-        return this.region;
     }
 
     public boolean isDisposed() {

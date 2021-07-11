@@ -34,7 +34,7 @@ import java.util.*;
 /**
  * Provides an extension to vanilla's {@link WorldRenderer}.
  */
-public class SodiumWorldRenderer implements ChunkStatusListener {
+public final class SodiumWorldRenderer implements ChunkStatusListener {
     private static SodiumWorldRenderer instance;
 
     private final MinecraftClient client;
@@ -251,7 +251,8 @@ public class SodiumWorldRenderer implements ChunkStatusListener {
                 this.renderPassManager,
                 this.world,
                 backendProvider.createCuller(this.world, this.renderDistance),
-                backendProvider.createRenderSectionContainer(this.chunkRenderer));
+                backendProvider.createRenderSectionContainer(this.chunkRenderer),
+                backendProvider.createChunkRenderList());
         this.renderSectionManager.loadChunks();
     }
 

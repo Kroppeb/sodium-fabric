@@ -40,7 +40,7 @@ import net.minecraft.world.chunk.ChunkSection;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class RenderSectionManager implements ChunkStatusListener, RegionCuller.CullerInteractor {
+public class RenderSectionManager implements ChunkStatusListener, SectionCuller.CullerInteractor {
     /**
      * The maximum distance a chunk can be from the player's camera in order to be eligible for blocking updates.
      */
@@ -57,7 +57,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
 
     private final ChunkAdjacencyMap adjacencyMap = new ChunkAdjacencyMap();
 
-    private final ChunkRenderList chunkRenderList = new ChunkRenderList();
+    private final ChunkRenderList chunkRenderList;
 
     private final ObjectList<RenderSection> tickableChunks = new ObjectArrayList<>();
     private final ObjectList<BlockEntity> visibleBlockEntities = new ObjectArrayList<>();
@@ -79,12 +79,13 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
             Culler culler,
-            RenderSectionContainer renderSectionContainer
-    ) {
+            RenderSectionContainer renderSectionContainer,
+            ChunkRenderList chunkRenderList) {
         this.chunkRenderer = chunkRenderer;
         this.world = world;
 
         this.builder = new ChunkBuilder(chunkRenderer.getVertexType());
+        this.chunkRenderList = chunkRenderList;
         this.builder.init(world, renderPassManager);
 
         this.needsUpdate = true;
@@ -99,6 +100,7 @@ public class RenderSectionManager implements ChunkStatusListener, RegionCuller.C
 
         this.culler = culler;
         this.culler.setCullerInteractor(this);
+        this.culler.setFrustumChecker(renderSectionContainer);
     }
 
     public void loadChunks() {

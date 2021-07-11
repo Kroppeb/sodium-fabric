@@ -7,7 +7,7 @@ import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import java.util.Collection;
 import java.util.Iterator;
 
-public interface RenderSectionContainer {
+public interface RenderSectionContainer extends SectionCuller.FrustumChecker {
     // TODO: figure out why this doesn't need the camera
     void updateVisibility(FrustumExtended frustum);
 

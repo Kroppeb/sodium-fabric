@@ -2,10 +2,7 @@ package me.jellysquid.mods.sodium.client.render.chunk.backend;
 
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
-import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.Culler;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionContainer;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
+import me.jellysquid.mods.sodium.client.render.chunk.*;
 import me.jellysquid.mods.sodium.client.render.chunk.backend.advanced.AdvancedBackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RegionBackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.format.sfp.ModelVertexType;
@@ -33,10 +30,13 @@ public interface BackendProvider {
 
     RenderSectionContainer createRenderSectionContainer(ChunkRenderer chunkRenderer);
 
+    ChunkRenderList createChunkRenderList();
+
     RenderSectionManager createRenderSectionManager(
             ChunkRenderer chunkRenderer,
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
             Culler culler,
-            RenderSectionContainer renderSectionContainer);
+            RenderSectionContainer renderSectionContainer,
+            ChunkRenderList chunkRenderList);
 }

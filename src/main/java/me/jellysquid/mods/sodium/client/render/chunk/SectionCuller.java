@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphIterationQueue;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RenderRegionVisibility;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
 import net.minecraft.client.MinecraftClient;
@@ -19,7 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class RegionCuller implements Culler {
+public class SectionCuller implements Culler {
     /**
      * The minimum distance the culling plane can be from the player's camera. This helps to prevent mathematical
      * errors that occur when the fog distance is less than 8 blocks in width, such as when using a blindness potion.
@@ -36,6 +35,9 @@ public class RegionCuller implements Culler {
 
     // lateinit
     private CullerInteractor cullerInteractor;
+    private FrustumChecker frustumChecker;
+
+
     private final ClientWorld world;
 
     private int currentFrame = 0;
@@ -52,7 +54,7 @@ public class RegionCuller implements Culler {
 
     private double fogRenderCutoff;
 
-    public RegionCuller(ClientWorld world, int renderDistance) {
+    public SectionCuller(ClientWorld world, int renderDistance) {
         this.world = world;
         this.renderDistance = renderDistance;
     }
@@ -60,6 +62,11 @@ public class RegionCuller implements Culler {
     @Override
     public void setCullerInteractor(CullerInteractor cullerInteractor) {
         this.cullerInteractor = cullerInteractor;
+    }
+
+    @Override
+    public void setFrustumChecker(FrustumChecker frustumChecker) {
+        this.frustumChecker = frustumChecker;
     }
 
     @Override
@@ -115,11 +122,7 @@ public class RegionCuller implements Culler {
             return;
         }
 
-        RenderRegionVisibility parentVisibility = parent.getRegion().getVisibility();
-
-        if (parentVisibility == RenderRegionVisibility.CULLED) {
-            return;
-        } else if (parentVisibility == RenderRegionVisibility.VISIBLE && info.isCulledByFrustum(this.frustum)) {
+        if (!this.frustumChecker.getVisibility(render, this.frustum)) {
             return;
         }
 
@@ -219,7 +222,7 @@ public class RegionCuller implements Culler {
         return x <= this.renderDistance && z <= this.renderDistance;
     }
 
-    interface CullerInteractor {
+    public interface CullerInteractor {
         RenderSection resolveSection(int chunkX, int chunkY, int chunkZ);
 
         void addChunkToVisible(RenderSection render);
@@ -227,5 +230,11 @@ public class RegionCuller implements Culler {
         void addEntitiesToRenderLists(RenderSection render);
 
         void schedulePendingUpdates(RenderSection section);
+    }
+
+    public interface FrustumChecker {
+        void updateVisibility(FrustumExtended frustum);
+
+        boolean getVisibility(RenderSection section, FrustumExtended frustum);
     }
 }

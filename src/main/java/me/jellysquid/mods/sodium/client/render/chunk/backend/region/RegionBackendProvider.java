@@ -26,7 +26,7 @@ public final class RegionBackendProvider implements BackendProvider {
 
     @Override
     public Culler createCuller(ClientWorld world, int renderDistance) {
-        return new RegionCuller(world, renderDistance);
+        return new SectionCuller(world, renderDistance);
     }
 
     @Override
@@ -35,7 +35,24 @@ public final class RegionBackendProvider implements BackendProvider {
     }
 
     @Override
-    public RenderSectionManager createRenderSectionManager(ChunkRenderer chunkRenderer, BlockRenderPassManager renderPassManager, ClientWorld world, Culler culler, RenderSectionContainer renderSectionContainer) {
-        return new RenderSectionManager(chunkRenderer, renderPassManager, world, culler, renderSectionContainer);
+    public ChunkRenderList createChunkRenderList() {
+        return new RegionalChunkRenderList();
+    }
+
+    @Override
+    public RenderSectionManager createRenderSectionManager(
+            ChunkRenderer chunkRenderer,
+            BlockRenderPassManager renderPassManager,
+            ClientWorld world,
+            Culler culler,
+            RenderSectionContainer renderSectionContainer,
+            ChunkRenderList chunkRenderList) {
+        return new RenderSectionManager(
+                chunkRenderer,
+                renderPassManager,
+                world,
+                culler,
+                renderSectionContainer,
+                chunkRenderList);
     }
 }

@@ -4,7 +4,9 @@ import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import net.minecraft.client.render.Camera;
 
 public interface Culler {
-    void setCullerInteractor(RegionCuller.CullerInteractor cullerInteractor);
+    void setCullerInteractor(SectionCuller.CullerInteractor cullerInteractor);
+
+    void setFrustumChecker(SectionCuller.FrustumChecker frustumChecker);
 
     void setup(Camera camera);
 

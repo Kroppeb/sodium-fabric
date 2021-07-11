@@ -3,6 +3,7 @@ package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
+import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;
 import me.jellysquid.mods.sodium.client.gl.buffer.IndexedVertexData;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
@@ -16,9 +17,9 @@ import net.minecraft.util.math.ChunkSectionPos;
 
 import java.util.*;
 
-public class RenderRegionManager implements RenderSectionContainer {
+public class RenderRegionManager implements RenderSectionContainer, SectionCuller.FrustumChecker {
     private final Long2ReferenceOpenHashMap<RenderRegion> regions = new Long2ReferenceOpenHashMap<>();
-    private final Long2ReferenceMap<RenderSection> sections = new Long2ReferenceOpenHashMap<>();
+    private final Long2ReferenceMap<RegionalRenderSection> sections = new Long2ReferenceOpenHashMap<>();
 
     private final ChunkRenderer renderer;
 
@@ -26,6 +27,7 @@ public class RenderRegionManager implements RenderSectionContainer {
         this.renderer = renderer;
     }
 
+    @Override
     public void updateVisibility(FrustumExtended frustum) {
         for (RenderRegion region : this.regions.values()) {
             if (!region.isEmpty()) {
@@ -34,13 +36,28 @@ public class RenderRegionManager implements RenderSectionContainer {
         }
     }
 
+    @Override
+    public boolean getVisibility(RenderSection section, FrustumExtended frustum) {
+        RenderRegionVisibility parentVisibility = this.getRegionForSection(section).getVisibility();
+        return parentVisibility == RenderRegionVisibility.FULLY_VISIBLE ||
+                parentVisibility == RenderRegionVisibility.VISIBLE &&
+                        !section.getGraphInfo().isCulledByFrustum(frustum);
+    }
+
+    private RenderRegion getRegionForSection(RenderSection section) {
+        // TODO: we could use generics to have a class `RenderSection` and a subclass `RegionalRenderSection`
+        //       or add a map from RenderSection to RenderRegion
+        return this.getRenderRegionForChunkSection(section.getChunkX(), section.getChunkY(), section.getChunkZ());
+    }
+
+    @Override
     public void cleanup() {
         try (CommandList commandList = RenderDevice.INSTANCE.createCommandList()) {
             this.cleanup(commandList);
         }
     }
 
-    public void cleanup(CommandList commandList) {
+    private void cleanup(CommandList commandList) {
         Iterator<RenderRegion> it = this.regions.values()
                 .iterator();
 
@@ -48,6 +65,8 @@ public class RenderRegionManager implements RenderSectionContainer {
             RenderRegion region = it.next();
 
             if (region.isEmpty()) {
+                SodiumClientMod.logger().warn("Cleaning up a render region that should have been removed. PLEASE REPORT");
+
                 region.deleteResources(commandList);
 
                 it.remove();
@@ -144,7 +163,7 @@ public class RenderRegionManager implements RenderSectionContainer {
     }
 
 
-    public RenderRegion createRegionForChunk(int x, int y, int z) {
+    private RenderRegion createRegionForChunk(int x, int y, int z) {
         long key = RenderRegion.getRegionKeyForChunk(x, y, z);
         RenderRegion region = this.regions.get(key);
 
@@ -153,6 +172,11 @@ public class RenderRegionManager implements RenderSectionContainer {
         }
 
         return region;
+    }
+
+    private RenderRegion getRenderRegionForChunkSection(int x, int y, int z) {
+        long key = RenderRegion.getRegionKeyForChunk(x, y, z);
+        return this.regions.get(key);
     }
 
     public void delete(CommandList commandList) {
@@ -168,7 +192,7 @@ public class RenderRegionManager implements RenderSectionContainer {
     }
 
 
-    private static class PendingSectionUpload {
+    private static final class PendingSectionUpload {
         private final RenderSection section;
         private final ChunkMeshData meshData;
 
@@ -184,13 +208,13 @@ public class RenderRegionManager implements RenderSectionContainer {
     }
 
     @Override
-    public RenderSection createSection(RenderSectionManager renderSectionManager, int x, int y, int z) {
+    public RegionalRenderSection createSection(RenderSectionManager renderSectionManager, int x, int y, int z) {
 
         // Get region for the render section
         RenderRegion region = this.createRegionForChunk(x, y, z);
 
         // add new render section to the region
-        RenderSection renderSection = new RenderSection(renderSectionManager, x, y, z, region);
+        RegionalRenderSection renderSection = new RegionalRenderSection(renderSectionManager, x, y, z, region);
         region.addChunk(renderSection);
 
         // store a direct lookup to the render section
@@ -200,11 +224,13 @@ public class RenderRegionManager implements RenderSectionContainer {
     }
 
     @Override
-    public RenderSection remove(int x, int y, int z) {
-        RenderSection section = this.sections.remove(ChunkSectionPos.asLong(x, y, z));
+    public RegionalRenderSection remove(int x, int y, int z) {
+        RegionalRenderSection section = this.sections.remove(ChunkSectionPos.asLong(x, y, z));
 
-        if(section!= null){
-            RenderRegion region = section.getRegion();
+        if (section != null) {
+
+            // Shouldn't be null
+            RenderRegion region = this.getRenderRegionForChunkSection(x, y, z);
             region.removeChunk(section);
         }
 
@@ -212,7 +238,7 @@ public class RenderRegionManager implements RenderSectionContainer {
     }
 
     @Override
-    public RenderSection get(int x, int y, int z) {
+    public RegionalRenderSection get(int x, int y, int z) {
         return this.sections.get(ChunkSectionPos.asLong(x, y, z));
     }
 
