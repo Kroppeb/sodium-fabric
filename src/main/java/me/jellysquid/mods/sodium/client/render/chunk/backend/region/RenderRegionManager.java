@@ -15,6 +15,7 @@ import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkMeshData;
+import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
@@ -43,11 +44,11 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
     }
 
     @Override
-    public boolean getVisibility(RenderSection section, FrustumExtended frustum) {
-        RenderRegionVisibility parentVisibility = this.getRegionForSection(section).getVisibility();
+    public boolean getVisibility(ChunkGraphInfo info, FrustumExtended frustum) {
+        RenderRegionVisibility parentVisibility = this.getRegionForSection(info.getRenderSection()).getVisibility();
         return parentVisibility == RenderRegionVisibility.FULLY_VISIBLE ||
                 parentVisibility == RenderRegionVisibility.VISIBLE &&
-                        !section.getGraphInfo().isCulledByFrustum(frustum);
+                        !info.isCulledByFrustum(frustum);
     }
 
     private RenderRegion getRegionForSection(RenderSection section) {

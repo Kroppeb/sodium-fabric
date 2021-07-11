@@ -80,20 +80,45 @@ public class ChunkGraphInfo {
      * @return The x-coordinate of the origin position of this chunk render
      */
     public int getOriginX() {
-        return this.parent.getChunkX() << 4;
+        return this.getChunkX() << 4;
     }
 
     /**
      * @return The y-coordinate of the origin position of this chunk render
      */
     public int getOriginY() {
-        return this.parent.getChunkY() << 4;
+        return this.getChunkY() << 4;
     }
 
     /**
      * @return The z-coordinate of the origin position of this chunk render
      */
     public int getOriginZ() {
-        return this.parent.getChunkZ() << 4;
+        return this.getChunkZ() << 4;
+    }
+
+    public RenderSection getRenderSection() {
+        return this.parent;
+    }
+
+    public final ChunkGraphInfo getAdjacent(Direction dir) {
+        // TODO move adjacency from renders to graph info
+        RenderSection adjacent = this.parent.getAdjacent(dir);
+        if (adjacent == null) {
+            return null;
+        }
+        return adjacent.getGraphInfo();
+    }
+
+    public int getChunkX() {
+        return this.parent.getChunkX();
+    }
+
+    public int getChunkY() {
+        return this.parent.getChunkY();
+    }
+
+    public int getChunkZ() {
+        return this.parent.getChunkZ();
     }
 }

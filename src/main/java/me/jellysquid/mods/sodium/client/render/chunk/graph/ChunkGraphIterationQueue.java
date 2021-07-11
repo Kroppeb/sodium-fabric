@@ -1,12 +1,11 @@
 package me.jellysquid.mods.sodium.client.render.chunk.graph;
 
-import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import net.minecraft.util.math.Direction;
 
 import java.util.Arrays;
 
 public class ChunkGraphIterationQueue {
-    private RenderSection[] renders;
+    private ChunkGraphInfo[] sections;
     private Direction[] directions;
 
     private int pos;
@@ -17,32 +16,32 @@ public class ChunkGraphIterationQueue {
     }
 
     public ChunkGraphIterationQueue(int capacity) {
-        this.renders = new RenderSection[capacity];
+        this.sections = new ChunkGraphInfo[capacity];
         this.directions = new Direction[capacity];
 
         this.capacity = capacity;
     }
 
-    public void add(RenderSection render, Direction direction) {
+    public void add(ChunkGraphInfo section, Direction direction) {
         int i = this.pos++;
 
         if (i == this.capacity) {
             this.resize();
         }
 
-        this.renders[i] = render;
+        this.sections[i] = section;
         this.directions[i] = direction;
     }
 
     private void resize() {
         this.capacity *= 2;
 
-        this.renders = Arrays.copyOf(this.renders, this.capacity);
+        this.sections = Arrays.copyOf(this.sections, this.capacity);
         this.directions = Arrays.copyOf(this.directions, this.capacity);
     }
 
-    public RenderSection getRender(int i) {
-        return this.renders[i];
+    public ChunkGraphInfo getRender(int i) {
+        return this.sections[i];
     }
 
     public Direction getDirection(int i) {

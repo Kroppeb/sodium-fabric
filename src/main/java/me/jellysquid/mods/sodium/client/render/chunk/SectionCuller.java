@@ -97,17 +97,18 @@ public class SectionCuller implements Culler {
         ChunkGraphIterationQueue queue = this.iterationQueue;
 
         for (int i = 0; i < queue.size(); i++) {
-            RenderSection section = queue.getRender(i);
+            ChunkGraphInfo section = queue.getRender(i);
             Direction flow = queue.getDirection(i);
 
-            this.cullerInteractor.schedulePendingUpdates(section);
+            // TODO: @Kroppeb understand what this does
+            this.cullerInteractor.schedulePendingUpdates(section.getRenderSection());
 
             for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
-                if (this.isCulled(section.getGraphInfo(), flow, dir)) {
+                if (this.isCulled(section, flow, dir)) {
                     continue;
                 }
 
-                RenderSection adj = section.getAdjacent(dir);
+                ChunkGraphInfo adj = section.getAdjacent(dir);
 
                 if (adj != null && this.isWithinRenderDistance(adj)) {
                     this.bfsEnqueue(section, adj, DirectionUtil.getOpposite(dir));
@@ -116,21 +117,20 @@ public class SectionCuller implements Culler {
         }
     }
 
-    private void bfsEnqueue(RenderSection parent, RenderSection render, Direction flow) {
-        ChunkGraphInfo info = render.getGraphInfo();
+    private void bfsEnqueue(ChunkGraphInfo previous, ChunkGraphInfo info, Direction flow) {
 
         if (info.getLastVisibleFrame() == this.currentFrame) {
             return;
         }
 
-        if (!this.frustumChecker.getVisibility(render, this.frustum)) {
+        if (!this.frustumChecker.getVisibility(info, this.frustum)) {
             return;
         }
 
         info.setLastVisibleFrame(this.currentFrame);
-        info.setCullingState(parent.getGraphInfo().getCullingState(), flow);
+        info.setCullingState(previous.getCullingState(), flow);
 
-        this.addVisible(render, flow);
+        this.addVisible(info, flow);
     }
 
     private void initSearch(Camera camera, FrustumExtended frustum, int frame, boolean spectator) {
@@ -160,7 +160,7 @@ public class SectionCuller implements Culler {
                 this.useOcclusionCulling = false;
             }
 
-            this.addVisible(rootRender, null);
+            this.addVisible(rootRender.getGraphInfo(), null);
         } else {
             chunkY = MathHelper.clamp(origin.getY() >> 4, this.world.getBottomSectionCoord(), this.world.getTopSectionCoord() - 1);
 
@@ -190,21 +190,23 @@ public class SectionCuller implements Culler {
             sorted.sort(Comparator.comparingDouble(node -> node.getSquaredDistance(origin)));
 
             for (RenderSection render : sorted) {
-                this.addVisible(render, null);
+                this.addVisible(render.getGraphInfo(), null);
             }
         }
     }
 
-    private void addVisible(RenderSection render, Direction flow) {
-        this.iterationQueue.add(render, flow);
+    private void addVisible(ChunkGraphInfo section, Direction flow) {
+        this.iterationQueue.add(section, flow);
 
-        if (this.useFogCulling && render.getSquaredDistanceXZ(this.cameraX, this.cameraZ) >= this.fogRenderCutoff) {
+        RenderSection renderSection = section.getRenderSection();
+
+        if (this.useFogCulling && renderSection.getSquaredDistanceXZ(this.cameraX, this.cameraZ) >= this.fogRenderCutoff) {
             return;
         }
 
-        if (!render.isEmpty()) {
-            this.cullerInteractor.addChunkToVisible(render);
-            this.cullerInteractor.addEntitiesToRenderLists(render);
+        if (!renderSection.isEmpty()) {
+            this.cullerInteractor.addChunkToVisible(renderSection);
+            this.cullerInteractor.addEntitiesToRenderLists(renderSection);
         }
     }
 
@@ -216,7 +218,7 @@ public class SectionCuller implements Culler {
         return this.useOcclusionCulling && from != null && !node.isVisibleThrough(from, to);
     }
 
-    private boolean isWithinRenderDistance(RenderSection adj) {
+    private boolean isWithinRenderDistance(ChunkGraphInfo adj) {
         int x = Math.abs(adj.getChunkX() - this.centerChunkX);
         int z = Math.abs(adj.getChunkZ() - this.centerChunkZ);
 
@@ -236,6 +238,6 @@ public class SectionCuller implements Culler {
     public interface FrustumChecker {
         void updateVisibility(FrustumExtended frustum);
 
-        boolean getVisibility(RenderSection section, FrustumExtended frustum);
+        boolean getVisibility(ChunkGraphInfo section, FrustumExtended frustum);
     }
 }

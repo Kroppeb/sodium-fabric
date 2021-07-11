@@ -29,6 +29,7 @@ public class RenderSection {
     private final int chunkX, chunkY, chunkZ;
 
     private final Map<BlockRenderPass, ChunkGraphicsState> graphicsStates;
+    @Deprecated
     private final ChunkGraphInfo graphInfo;
 
     private final RenderSection[] adjacent = new RenderSection[DirectionUtil.ALL_DIRECTIONS.length];
@@ -262,10 +263,12 @@ public class RenderSection {
                 this.chunkX, this.chunkY, this.chunkZ);
     }
 
+    @Deprecated
     public ChunkGraphInfo getGraphInfo() {
         return this.graphInfo;
     }
 
+    @Deprecated
     public void setOcclusionData(ChunkOcclusionData occlusionData) {
         this.graphInfo.setOcclusionData(occlusionData);
     }
