@@ -1,9 +1,8 @@
 package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
-import me.jellysquid.mods.sodium.client.gl.tessellation.GlTessellation;
+import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
@@ -40,7 +39,7 @@ public class RenderRegion {
     private final ChunkRenderer renderer;
 
     private final Set<RenderSection> chunks = new ObjectOpenHashSet<>();
-    private final Map<BlockRenderPass, RenderRegionArenas> arenas = new EnumMap<>(BlockRenderPass.class);
+    private final Map<BlockRenderPass, BiBufferArenas> arenas = new EnumMap<>(BlockRenderPass.class);
 
     private final int x, y, z;
 
@@ -58,12 +57,12 @@ public class RenderRegion {
         return new RenderRegion(renderer, x >> REGION_WIDTH_SH, y >> REGION_HEIGHT_SH, z >> REGION_LENGTH_SH);
     }
 
-    public RenderRegionArenas getArenas(BlockRenderPass pass) {
+    public BiBufferArenas getArenas(BlockRenderPass pass) {
         return this.arenas.get(pass);
     }
 
     public void deleteResources(CommandList commandList) {
-        for (RenderRegionArenas arenas : this.arenas.values()) {
+        for (BiBufferArenas arenas : this.arenas.values()) {
             arenas.delete(commandList);
         }
 
@@ -86,11 +85,11 @@ public class RenderRegion {
         return this.z << REGION_LENGTH_SH << 4;
     }
 
-    public RenderRegionArenas getOrCreateArenas(CommandList commandList, BlockRenderPass pass) {
-        RenderRegionArenas arenas = this.arenas.get(pass);
+    public BiBufferArenas getOrCreateArenas(CommandList commandList, BlockRenderPass pass) {
+        BiBufferArenas arenas = this.arenas.get(pass);
 
         if (arenas == null) {
-            this.arenas.put(pass, arenas = new RenderRegionArenas(commandList, this.renderer));
+            this.arenas.put(pass, arenas = new BiBufferArenas(commandList, this.renderer.getVertexType(), 1024));
         }
 
         return arenas;
@@ -131,54 +130,5 @@ public class RenderRegion {
 
     public static int getChunkIndex(int x, int y, int z) {
         return (x * RenderRegion.REGION_LENGTH * RenderRegion.REGION_HEIGHT) + (y * RenderRegion.REGION_LENGTH) + z;
-    }
-
-    public static class RenderRegionArenas {
-        public final GlBufferArena vertexBuffers;
-        public final GlBufferArena indexBuffers;
-
-        public GlTessellation tessellation;
-
-        public RenderRegionArenas(CommandList commandList, ChunkRenderer renderer) {
-            this.vertexBuffers = new GlBufferArena(commandList, 24 * 1024, renderer.getVertexType().getBufferVertexFormat().getStride());
-            this.indexBuffers = new GlBufferArena(commandList, 6 * 1024, 4);
-        }
-
-        public void delete(CommandList commandList) {
-            this.vertexBuffers.delete(commandList);
-            this.indexBuffers.delete(commandList);
-
-            if (this.tessellation != null) {
-                commandList.deleteTessellation(this.tessellation);
-            }
-        }
-
-        public void setTessellation(GlTessellation tessellation) {
-            this.tessellation = tessellation;
-        }
-
-        public GlTessellation getTessellation() {
-            return this.tessellation;
-        }
-
-        public boolean isEmpty() {
-            return this.vertexBuffers.isEmpty() && this.indexBuffers.isEmpty();
-        }
-
-        public long getUsedMemory() {
-            return this.vertexBuffers.getUsedMemory() + this.indexBuffers.getUsedMemory();
-        }
-
-        public long getAllocatedMemory() {
-            return this.vertexBuffers.getAllocatedMemory() + this.indexBuffers.getAllocatedMemory();
-        }
-
-        public void invalidateTessellation(CommandList commandList) {
-            if (this.tessellation != null) {
-                commandList.deleteTessellation(this.tessellation);
-
-                this.tessellation = null;
-            }
-        }
     }
 }

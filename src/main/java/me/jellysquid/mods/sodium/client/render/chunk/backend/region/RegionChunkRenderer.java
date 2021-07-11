@@ -15,6 +15,7 @@ import me.jellysquid.mods.sodium.client.gl.util.MultiDrawBatch;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.*;
+import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkVisibilityListener;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
@@ -173,7 +174,7 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
         return batch;
     }
 
-    private GlTessellation createTessellation(CommandList commandList, RenderRegion.RenderRegionArenas arenas) {
+    private GlTessellation createTessellation(CommandList commandList, BiBufferArenas arenas) {
         GlTessellation tessellation = arenas.getTessellation();
 
         if (tessellation == null) {
@@ -206,7 +207,7 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
         }
     }
 
-    private GlTessellation createRegionTessellation(CommandList commandList, RenderRegion.RenderRegionArenas arenas) {
+    private GlTessellation createRegionTessellation(CommandList commandList, BiBufferArenas arenas) {
         return commandList.createTessellation(GlPrimitiveType.TRIANGLES, new TessellationBinding[] {
                 new TessellationBinding(arenas.vertexBuffers.getBufferObject(), this.vertexAttributeBindings)
         }, arenas.indexBuffers.getBufferObject());

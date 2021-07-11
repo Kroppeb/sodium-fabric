@@ -10,6 +10,7 @@ import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.SectionCuller;
+import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
@@ -125,7 +126,7 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
             return;
         }
 
-        RenderRegion.RenderRegionArenas arenas = region.getOrCreateArenas(commandList, pass);
+        BiBufferArenas arenas = region.getOrCreateArenas(commandList, pass);
 
         boolean bufferChanged = arenas.vertexBuffers.upload(commandList, sectionUploads.stream().map(i -> i.vertexUpload));
         bufferChanged |= arenas.indexBuffers.upload(commandList, sectionUploads.stream().map(i -> i.indicesUpload));
@@ -280,7 +281,7 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
     public Collection<? extends String> getMemoryDebugStrings() {
         List<String> list = new ArrayList<>();
 
-        Iterator<RenderRegion.RenderRegionArenas> it = this.regions.values()
+        Iterator<BiBufferArenas> it = this.regions.values()
                 .stream()
                 .flatMap(i -> Arrays.stream(BlockRenderPass.values())
                         .map(i::getArenas))
@@ -293,7 +294,7 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
         long allocated = 0;
 
         while (it.hasNext()) {
-            RenderRegion.RenderRegionArenas arena = it.next();
+            BiBufferArenas arena = it.next();
             used += arena.getUsedMemory();
             allocated += arena.getAllocatedMemory();
 
