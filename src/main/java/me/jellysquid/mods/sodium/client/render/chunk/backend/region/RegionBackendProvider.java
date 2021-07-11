@@ -5,6 +5,7 @@ import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import me.jellysquid.mods.sodium.client.render.chunk.*;
 import me.jellysquid.mods.sodium.client.render.chunk.base.BackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
+import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
 import me.jellysquid.mods.sodium.client.render.chunk.format.sfp.ModelVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
 import net.minecraft.client.world.ClientWorld;

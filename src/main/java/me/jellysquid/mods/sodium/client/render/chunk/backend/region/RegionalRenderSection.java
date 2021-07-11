@@ -1,6 +1,6 @@
 package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSection;
+import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
 
 public class RegionalRenderSection extends RenderSection {

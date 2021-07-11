@@ -1,6 +1,6 @@
 package me.jellysquid.mods.sodium.client.render.chunk.graph;
 
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSection;
+import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import net.minecraft.util.math.Direction;
 
 import java.util.Arrays;
