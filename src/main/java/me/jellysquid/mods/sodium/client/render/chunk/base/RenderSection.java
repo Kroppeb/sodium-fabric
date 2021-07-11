@@ -60,6 +60,19 @@ public class RenderSection {
         return this.adjacent[dir.ordinal()];
     }
 
+    private void disconnectNeighborNodes() {
+        for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
+            RenderSection adj = this.getAdjacent(dir);
+
+            if (adj != null) {
+                adj.setAdjacentNode(DirectionUtil.getOpposite(dir), null);
+
+                // TODO: Is this really needed?
+                this.setAdjacentNode(dir, null);
+            }
+        }
+    }
+
     public void setAdjacentNode(Direction dir, RenderSection node) {
         this.adjacent[dir.ordinal()] = node;
     }
@@ -90,6 +103,7 @@ public class RenderSection {
         this.deleteGraphicsState();
 
         this.disposed = true;
+        this.disconnectNeighborNodes();
     }
 
     private void deleteGraphicsState() {
