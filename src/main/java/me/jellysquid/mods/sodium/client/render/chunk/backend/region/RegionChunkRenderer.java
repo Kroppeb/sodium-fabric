@@ -1,4 +1,4 @@
-package me.jellysquid.mods.sodium.client.render.chunk;
+package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
 import com.google.common.collect.Lists;
 import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexAttributeBinding;
@@ -14,11 +14,11 @@ import me.jellysquid.mods.sodium.client.gl.util.ElementRange;
 import me.jellysquid.mods.sodium.client.gl.util.MultiDrawBatch;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RegionalChunkRenderList;
+import me.jellysquid.mods.sodium.client.render.chunk.*;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkVisibilityListener;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkMeshAttribute;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RenderRegion;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
 import net.minecraft.client.util.math.MatrixStack;
 import org.lwjgl.opengl.GL20C;
@@ -35,10 +35,13 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
     private final GlVertexAttributeBinding[] vertexAttributeBindings;
 
     private final GlMutableBuffer chunkInfoBuffer;
+    private final RegionalChunkRenderList renderList;
 
     @SuppressWarnings("PointlessArithmeticExpression")
     public RegionChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
+
+        this.renderList = new RegionalChunkRenderList();
 
         this.vertexAttributeBindings = new GlVertexAttributeBinding[] {
                 new GlVertexAttributeBinding(ChunkShaderBindingPoints.ATTRIBUTE_POSITION_ID,
@@ -80,14 +83,16 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
     }
 
     @Override
-    public void render(MatrixStack matrixStack, CommandList commandList,
-                       ChunkRenderList list, BlockRenderPass pass,
-                       ChunkCameraContext camera) {
+    public void render(
+            MatrixStack matrixStack,
+            CommandList commandList,
+            BlockRenderPass pass,
+            ChunkCameraContext camera) {
         super.begin(pass, matrixStack);
 
         this.bindDrawParameters();
 
-        for (Map.Entry<RenderRegion, List<RenderSection>> entry : sortedRegions(list, pass.isTranslucent())) {
+        for (Map.Entry<RenderRegion, List<RenderSection>> entry : this.sortedRegions(pass.isTranslucent())) {
             RenderRegion region = entry.getKey();
             List<RenderSection> regionSections = entry.getValue();
 
@@ -102,7 +107,7 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
             GlTessellation tessellation = this.createTessellation(commandList, region.getArenas(pass));
             this.executeDrawBatch(commandList, tessellation, this.batch);
         }
-        
+
         super.end();
     }
 
@@ -216,9 +221,8 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
                 .deleteBuffer(this.chunkInfoBuffer);
     }
 
-    private static Iterable<Map.Entry<RenderRegion, List<RenderSection>>> sortedRegions(ChunkRenderList list, boolean translucent) {
-        // TODO fix ugly cast
-        return ((RegionalChunkRenderList) list).sorted(translucent);
+    private Iterable<Map.Entry<RenderRegion, List<RenderSection>>> sortedRegions(boolean translucent) {
+        return this.renderList.sorted(translucent);
     }
 
     private static Iterable<RenderSection> sortedChunks(List<RenderSection> chunks, boolean translucent) {
@@ -227,5 +231,10 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
 
     private static float getCameraTranslation(int chunkBlockPos, int cameraBlockPos, float cameraPos) {
         return (chunkBlockPos - cameraBlockPos) - cameraPos;
+    }
+
+    @Override
+    public ChunkVisibilityListener getChunkVisibilityListener() {
+        return this.renderList;
     }
 }

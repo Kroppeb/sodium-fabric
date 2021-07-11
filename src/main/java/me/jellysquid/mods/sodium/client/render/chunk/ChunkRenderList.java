@@ -1,14 +1,7 @@
 package me.jellysquid.mods.sodium.client.render.chunk;
 
-import me.jellysquid.mods.sodium.client.render.chunk.backend.region.RenderRegion;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkVisibilityListener;
 
-import java.util.List;
-import java.util.Map;
+public interface ChunkRenderList extends ChunkVisibilityListener {
 
-public interface ChunkRenderList {
-    void clear();
-
-    void add(RenderSection render);
-
-    int getCount();
 }

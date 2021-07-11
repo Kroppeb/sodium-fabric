@@ -9,6 +9,8 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkVisibilityListener;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuilder;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
@@ -57,7 +59,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
 
     private final ChunkAdjacencyMap adjacencyMap = new ChunkAdjacencyMap();
 
-    private final ChunkRenderList chunkRenderList;
+    private final ChunkVisibilityListener chunkRenderList;
 
     private final ObjectList<RenderSection> tickableChunks = new ObjectArrayList<>();
     private final ObjectList<BlockEntity> visibleBlockEntities = new ObjectArrayList<>();
@@ -79,13 +81,12 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
             Culler culler,
-            RenderSectionContainer renderSectionContainer,
-            ChunkRenderList chunkRenderList) {
+            RenderSectionContainer renderSectionContainer) {
         this.chunkRenderer = chunkRenderer;
         this.world = world;
 
         this.builder = new ChunkBuilder(chunkRenderer.getVertexType());
-        this.chunkRenderList = chunkRenderList;
+        this.chunkRenderList = chunkRenderer.getChunkVisibilityListener();
         this.builder.init(world, renderPassManager);
 
         this.needsUpdate = true;
@@ -238,7 +239,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         RenderDevice device = RenderDevice.INSTANCE;
         CommandList commandList = device.createCommandList();
 
-        this.chunkRenderer.render(matrixStack, commandList, this.chunkRenderList, pass, new ChunkCameraContext(x, y, z));
+        this.chunkRenderer.render(matrixStack, commandList, pass, new ChunkCameraContext(x, y, z));
 
         commandList.flush();
     }

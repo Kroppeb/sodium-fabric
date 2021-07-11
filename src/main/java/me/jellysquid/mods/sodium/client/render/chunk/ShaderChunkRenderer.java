@@ -2,17 +2,16 @@ package me.jellysquid.mods.sodium.client.render.chunk;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexFormat;
-import me.jellysquid.mods.sodium.client.gl.shader.*;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkMeshAttribute;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkFogMode;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkProgram;
-import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
+import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderManager;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderOptions;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
 
 import java.util.Map;
 
@@ -25,6 +24,8 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
     protected final RenderDevice device;
 
     protected ChunkProgram activeProgram;
+
+    protected final ChunkShaderManager chunkShaderManager = new ChunkShaderManager();
 
     public ShaderChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         this.device = device;
@@ -43,7 +44,8 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         ChunkProgram program = programs.get(options);
 
         if (program == null) {
-            programs.put(options, program = this.createShader(this.device, getShaderName(pass), options));
+            programs.put(options, program = this.chunkShaderManager.createShader(
+                    this.device, this.getShaderName(pass), options));
         }
 
         return program;
@@ -59,30 +61,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         };
     }
 
-    private ChunkProgram createShader(RenderDevice device, String path, ChunkShaderOptions options) {
-        ShaderConstants constants = options.constants();
 
-        GlShader vertShader = ShaderLoader.loadShader(ShaderType.VERTEX,
-                new Identifier("sodium", path + ".vsh"), constants);
-        
-        GlShader fragShader = ShaderLoader.loadShader(ShaderType.FRAGMENT,
-                new Identifier("sodium", path + ".fsh"), constants);
-
-        try {
-            return GlProgram.builder(new Identifier("sodium", "chunk_shader"))
-                    .attachShader(vertShader)
-                    .attachShader(fragShader)
-                    .bindAttribute("a_Pos", ChunkShaderBindingPoints.ATTRIBUTE_POSITION_ID)
-                    .bindAttribute("a_Color", ChunkShaderBindingPoints.ATTRIBUTE_COLOR)
-                    .bindAttribute("a_TexCoord", ChunkShaderBindingPoints.ATTRIBUTE_BLOCK_TEXTURE)
-                    .bindAttribute("a_LightCoord", ChunkShaderBindingPoints.ATTRIBUTE_LIGHT_TEXTURE)
-                    .bindFragmentData("fragColor", ChunkShaderBindingPoints.FRAG_COLOR)
-                    .build((name) -> new ChunkProgram(device, name, options));
-        } finally {
-            vertShader.delete();
-            fragShader.delete();
-        }
-    }
 
     protected void begin(BlockRenderPass pass, MatrixStack matrixStack) {
         ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH);
@@ -99,14 +78,12 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
     @Override
     public void delete() {
-        this.programs.values()
-                .stream()
-                .flatMap(i -> i.values().stream())
-                .forEach(GlProgram::delete);
         this.programs.clear();
+        this.chunkShaderManager.delete();
     }
 
     @Override
+    @Deprecated
     public ChunkVertexType getVertexType() {
         return this.vertexType;
     }

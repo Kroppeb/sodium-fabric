@@ -3,9 +3,9 @@ package me.jellysquid.mods.sodium.client.render;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
-import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderer;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
+import me.jellysquid.mods.sodium.client.render.chunk.base.BackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkModelVertexFormats;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
@@ -251,8 +251,7 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
                 this.renderPassManager,
                 this.world,
                 backendProvider.createCuller(this.world, this.renderDistance),
-                backendProvider.createRenderSectionContainer(this.chunkRenderer),
-                backendProvider.createChunkRenderList());
+                backendProvider.createRenderSectionContainer(this.chunkRenderer));
         this.renderSectionManager.loadChunks();
     }
 

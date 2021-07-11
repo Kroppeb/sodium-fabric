@@ -3,7 +3,8 @@ package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import me.jellysquid.mods.sodium.client.render.chunk.*;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.BackendProvider;
+import me.jellysquid.mods.sodium.client.render.chunk.base.BackendProvider;
+import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.format.sfp.ModelVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
 import net.minecraft.client.world.ClientWorld;
@@ -35,24 +36,17 @@ public final class RegionBackendProvider implements BackendProvider {
     }
 
     @Override
-    public ChunkRenderList createChunkRenderList() {
-        return new RegionalChunkRenderList();
-    }
-
-    @Override
     public RenderSectionManager createRenderSectionManager(
             ChunkRenderer chunkRenderer,
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
             Culler culler,
-            RenderSectionContainer renderSectionContainer,
-            ChunkRenderList chunkRenderList) {
+            RenderSectionContainer renderSectionContainer) {
         return new RenderSectionManager(
                 chunkRenderer,
                 renderPassManager,
                 world,
                 culler,
-                renderSectionContainer,
-                chunkRenderList);
+                renderSectionContainer);
     }
 }
