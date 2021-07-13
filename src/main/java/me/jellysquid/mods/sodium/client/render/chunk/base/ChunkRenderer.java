@@ -1,10 +1,10 @@
 package me.jellysquid.mods.sodium.client.render.chunk.base;
 
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
-import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkCameraContext;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
 
 /**
  * TODO: update this
@@ -15,8 +15,6 @@ import net.minecraft.client.util.math.MatrixStack;
  *
  * The ChunkRenderer is responsible dispatching the required drawcalls to render the given chunks on screen
  * and manage the resources required to do so
- *
- * Which chunks should be drawn is communicated through {@link #getChunkVisibilityListener()}
  */
 public interface ChunkRenderer {
     /**
@@ -29,18 +27,12 @@ public interface ChunkRenderer {
      */
     void render(MatrixStack matrixStack, CommandList commandList, BlockRenderPass pass, ChunkCameraContext camera);
 
-    ChunkVisibilityListener getChunkVisibilityListener();
-
     /**
      * Deletes this renderer and any resources attached to it.
      */
     void delete();
 
-    // TODO why does the Chunk renderer need to provide the vertex type
 
-    /**
-     * Returns the vertex format used by this chunk render backend for rendering meshes.
-     */
-    @Deprecated
-    ChunkVertexType getVertexType();
+    // TODO: I don't like this here :shrug:
+    VisibilityTracker createVisibilityTracker(ClientWorld world, int renderDistance);
 }

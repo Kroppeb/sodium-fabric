@@ -3,9 +3,7 @@ package me.jellysquid.mods.sodium.client.render;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
-import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
-import me.jellysquid.mods.sodium.client.render.chunk.base.BackendProvider;
+import me.jellysquid.mods.sodium.client.render.chunk.base.*;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkModelVertexFormats;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
@@ -29,7 +27,8 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.profiler.Profiler;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.SortedSet;
 
 /**
  * Provides an extension to vanilla's {@link WorldRenderer}.
@@ -48,9 +47,11 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
     private boolean useEntityCulling;
 
     private Frustum frustum;
+    @Deprecated
     private RenderSectionManager renderSectionManager;
+    private Pipeline pipeline;
     private BlockRenderPassManager renderPassManager;
-    private ChunkRenderer chunkRenderer;
+
 
     /**
      * Instantiates Sodium's world renderer. This should be called at the time of the world renderer initialization.
@@ -109,14 +110,10 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
     private void unloadWorld() {
         ChunkRenderCacheShared.destroyRenderContext(this.world);
 
-        if (this.renderSectionManager != null) {
-            this.renderSectionManager.destroy();
+        if (this.pipeline != null) {
+            this.pipeline.delete();
+            this.pipeline = null;
             this.renderSectionManager = null;
-        }
-
-        if (this.chunkRenderer != null) {
-            this.chunkRenderer.delete();
-            this.chunkRenderer = null;
         }
 
         this.world = null;
@@ -126,11 +123,13 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
      * @return The number of chunk renders which are visible in the current camera's frustum
      */
     public int getVisibleChunkCount() {
-        return this.renderSectionManager.getVisibleChunkCount();
+        return this.pipeline.getVisibleChunkCount();
     }
 
     /**
-     * Notifies the chunk renderer that the graph scene has changed and should be re-computed.
+     * Notifies the chunk renderer that the graph scene has changed and should be re-computed. <br/>
+     * Seems to be called when the screen size or fov changes, the perspective changes or (and
+     * maybe the cause of the bug: when the render distance changes
      */
     public void scheduleTerrainUpdate() {
         // BUG: seems to be called before init
@@ -143,7 +142,7 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
      * @return True if no chunks are pending rebuilds
      */
     public boolean isTerrainRenderComplete() {
-        return this.renderSectionManager.getBuilder().isBuildQueueEmpty();
+        return this.renderSectionManager.isBuildQueueEmpty();
     }
 
     /**
@@ -169,6 +168,8 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
             throw new IllegalStateException("Client instance has no active player entity");
         }
 
+        // TODO should these camera checks be handled by RenderSectionManager
+
         Vec3d pos = camera.getPos();
         float pitch = camera.getPitch();
         float yaw = camera.getYaw();
@@ -193,12 +194,12 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
         if (!hasForcedFrustum && this.renderSectionManager.isGraphDirty()) {
             profiler.swap("chunk_graph_rebuild");
 
-            this.renderSectionManager.update(camera, (FrustumExtended) frustum, frame, spectator);
+            this.pipeline.update(camera, (FrustumExtended) frustum, frame, spectator);
         }
 
         profiler.swap("visible_chunk_tick");
 
-        this.renderSectionManager.tickVisibleRenders();
+        this.pipeline.tickVisibleRenders();
 
         profiler.pop();
 
@@ -212,7 +213,7 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
         BlockRenderPass pass = this.renderPassManager.getRenderPassForLayer(renderLayer);
         pass.startDrawing();
 
-        this.renderSectionManager.renderLayer(matrixStack, pass, x, y, z);
+        this.pipeline.renderLayer(matrixStack, pass, x, y, z);
 
         pass.endDrawing();
     }
@@ -226,14 +227,10 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
     }
 
     private void initRenderer() {
-        if (this.renderSectionManager != null) {
-            this.renderSectionManager.destroy();
+        if (this.pipeline != null) {
+            this.pipeline.delete();
+            this.pipeline = null;
             this.renderSectionManager = null;
-        }
-
-        if (this.chunkRenderer != null) {
-            this.chunkRenderer.delete();
-            this.chunkRenderer = null;
         }
 
         RenderDevice device = RenderDevice.INSTANCE;
@@ -244,15 +241,18 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
 
         var backendProvider = BackendProvider.getBackend(SodiumClientMod.options());
 
-        this.chunkRenderer = backendProvider.createChunkRenderer(device, ChunkModelVertexFormats.DEFAULT);
 
+        ChunkRenderer chunkRenderer = backendProvider.createChunkRenderer(device, ChunkModelVertexFormats.DEFAULT);
+        VisibilityTracker visibilityTracker = chunkRenderer.createVisibilityTracker(this.world, this.renderDistance);
         this.renderSectionManager = backendProvider.createRenderSectionManager(
-                this.chunkRenderer,
+                visibilityTracker,
+                ChunkModelVertexFormats.DEFAULT,
                 this.renderPassManager,
                 this.world,
-                backendProvider.createCuller(this.world, this.renderDistance),
-                backendProvider.createRenderSectionContainer(this.chunkRenderer));
+                backendProvider.createRenderSectionContainer(ChunkModelVertexFormats.DEFAULT));
+
         this.renderSectionManager.loadChunks();
+        this.pipeline = new Pipeline(this.renderSectionManager, visibilityTracker, chunkRenderer);
     }
 
     public void renderTileEntities(MatrixStack matrices, BufferBuilderStorage bufferBuilders, Long2ObjectMap<SortedSet<BlockBreakingInfo>> blockBreakingProgressions,
@@ -266,7 +266,7 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
 
         BlockEntityRenderDispatcher blockEntityRenderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher();
 
-        for (BlockEntity blockEntity : this.renderSectionManager.getVisibleBlockEntities()) {
+        for (BlockEntity blockEntity : this.pipeline.getVisibleBlockEntities()) {
             BlockPos pos = blockEntity.getPos();
 
             matrices.push();
@@ -342,7 +342,7 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = minY; y <= maxY; y++) {
-                    if (this.renderSectionManager.isSectionVisible(x, y, z)) {
+                    if (this.pipeline.getVisibilityTracker().isSectionVisible(x, y, z)) {
                         return true;
                     }
                 }
@@ -362,7 +362,8 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
     public String getChunksDebugString() {
         // C: visible/total
         // TODO: add dirty and queued counts
-        return String.format("C: %s/%s", this.renderSectionManager.getVisibleChunkCount(), this.renderSectionManager.getTotalSections());
+        return String.format("C: %s/%s",
+                this.pipeline.getVisibilityTracker().getVisibleChunkCount(), this.renderSectionManager.getTotalSections());
     }
 
     /**
@@ -392,12 +393,8 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
         this.renderSectionManager.scheduleRebuild(x, y, z, important);
     }
 
-    public ChunkRenderer getChunkRenderer() {
-        return this.chunkRenderer;
-    }
-
     public Collection<? extends String> getMemoryDebugStrings() {
-        return this.renderSectionManager.getRenderSectionContainer().getMemoryDebugStrings();
+        return this.renderSectionManager.getRenderSectionContainerMemoryDebugStrings();
     }
 
     private static long toMib(long x) {

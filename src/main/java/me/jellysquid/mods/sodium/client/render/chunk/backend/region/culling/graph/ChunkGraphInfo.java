@@ -1,4 +1,4 @@
-package me.jellysquid.mods.sodium.client.render.chunk.graph;
+package me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph;
 
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
@@ -71,12 +71,8 @@ public class ChunkGraphInfo {
         this.cullingState = 0;
     }
 
-    public boolean isCulledByFrustum(FrustumExtended frustum) {
-        float x = this.getOriginX();
-        float y = this.getOriginY();
-        float z = this.getOriginZ();
-
-        return !frustum.fastAabbTest(x, y, z, x + 16.0f, y + 16.0f, z + 16.0f);
+    public boolean isInsideFrustum(FrustumExtended frustum) {
+        return this.renderSection.isInsideFrustum(frustum);
     }
 
     /**

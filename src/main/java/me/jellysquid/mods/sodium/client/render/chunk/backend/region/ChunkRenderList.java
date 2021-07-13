@@ -1,7 +1,6 @@
 package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
 import it.unimi.dsi.fastutil.objects.*;
-import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderList;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 
 import java.util.Collections;
@@ -9,7 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public class RegionalChunkRenderList implements ChunkRenderList {
+public class ChunkRenderList {
     private final Reference2ObjectLinkedOpenHashMap<RenderRegion, List<RenderSection>> entries = new Reference2ObjectLinkedOpenHashMap<>();
 
     public Iterable<Map.Entry<RenderRegion, List<RenderSection>>> sorted(boolean reverse) {
@@ -53,12 +52,11 @@ public class RegionalChunkRenderList implements ChunkRenderList {
         }
     }
 
-    @Override
+
     public void clear() {
         this.entries.clear();
     }
 
-    @Override
     public void add(RenderSection render) {
         // TODO this cast is ugly
         RenderRegion region = ((RegionalRenderSection) render).getRegion();
@@ -67,7 +65,6 @@ public class RegionalChunkRenderList implements ChunkRenderList {
         sections.add(render);
     }
 
-    @Override
     public int getCount() {
         return this.entries.values()
                 .stream()

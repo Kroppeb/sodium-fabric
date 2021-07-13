@@ -14,15 +14,19 @@ import me.jellysquid.mods.sodium.client.gl.util.ElementRange;
 import me.jellysquid.mods.sodium.client.gl.util.MultiDrawBatch;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
-import me.jellysquid.mods.sodium.client.render.chunk.*;
+import me.jellysquid.mods.sodium.client.render.chunk.ChunkCameraContext;
+import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
+import me.jellysquid.mods.sodium.client.render.chunk.ShaderChunkRenderer;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.CullingSystem;
 import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
-import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkVisibilityListener;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
+import me.jellysquid.mods.sodium.client.render.chunk.base.VisibilityTracker;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkMeshAttribute;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL32C;
 import org.lwjgl.system.MemoryStack;
@@ -37,13 +41,13 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
     private final GlVertexAttributeBinding[] vertexAttributeBindings;
 
     private final GlMutableBuffer chunkInfoBuffer;
-    private final RegionalChunkRenderList renderList;
+    private final ChunkRenderList renderList;
 
     @SuppressWarnings("PointlessArithmeticExpression")
     public RegionChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
 
-        this.renderList = new RegionalChunkRenderList();
+        this.renderList = new ChunkRenderList();
 
         this.vertexAttributeBindings = new GlVertexAttributeBinding[] {
                 new GlVertexAttributeBinding(ChunkShaderBindingPoints.ATTRIBUTE_POSITION_ID,
@@ -236,7 +240,7 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
     }
 
     @Override
-    public ChunkVisibilityListener getChunkVisibilityListener() {
-        return this.renderList;
+    public VisibilityTracker createVisibilityTracker(ClientWorld world, int renderDistance) {
+        return new CullingSystem(this.renderList, world, renderDistance);
     }
 }

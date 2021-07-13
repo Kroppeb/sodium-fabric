@@ -1,12 +1,12 @@
-package me.jellysquid.mods.sodium.client.render.chunk;
+package me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
-import me.jellysquid.mods.sodium.client.render.chunk.base.Culler;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph.ChunkGraphInfoManager;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.base.SectionListener;
-import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
-import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphIterationQueue;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph.ChunkGraphInfo;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph.ChunkGraphIterationQueue;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
 import net.minecraft.client.MinecraftClient;
@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class SectionCuller implements Culler {
+public class SectionCuller {
     /**
      * The minimum distance the culling plane can be from the player's camera. This helps to prevent mathematical
      * errors that occur when the fog distance is less than 8 blocks in width, such as when using a blindness potion.
@@ -36,10 +36,6 @@ public class SectionCuller implements Culler {
      */
     private static final float FOG_PLANE_OFFSET = 12.0f;
 
-    // lateinit
-    private CullerInteractor cullerInteractor;
-    private FrustumChecker frustumChecker;
-
 
     private final ClientWorld world;
 
@@ -49,7 +45,7 @@ public class SectionCuller implements Culler {
     private final int renderDistance;
 
 
-    private float cameraX, cameraY, cameraZ;
+    private float cameraX, cameraZ;
     private int centerChunkX, centerChunkZ;
 
     private boolean useFogCulling;
@@ -59,38 +55,29 @@ public class SectionCuller implements Culler {
 
     private final ChunkGraphInfoManager chunkGraphInfoManager = new ChunkGraphInfoManager();
 
-    public SectionCuller(ClientWorld world, int renderDistance) {
+    private final CullingSystem cullingSystem;
+
+    public SectionCuller(ClientWorld world, int renderDistance, CullingSystem cullingSystem) {
         this.world = world;
         this.renderDistance = renderDistance;
+        this.cullingSystem = cullingSystem;
     }
 
-    @Override
-    public void setCullerInteractor(CullerInteractor cullerInteractor) {
-        this.cullerInteractor = cullerInteractor;
-    }
 
-    @Override
-    public void setFrustumChecker(FrustumChecker frustumChecker) {
-        this.frustumChecker = frustumChecker;
-    }
-
-    @Override
     public SectionListener getListener() {
         return this.chunkGraphInfoManager;
     }
 
-    @Override
+
     public boolean isSectionVisible(int x, int y, int z, int currentFrame) {
         ChunkGraphInfo chunkGraphInfo = this.chunkGraphInfoManager.get(x, y, z);
         return (chunkGraphInfo != null) && chunkGraphInfo.getLastVisibleFrame() == currentFrame;
     }
 
-    @Override
     public void setup(Camera camera) {
         Vec3d cameraPos = camera.getPos();
 
         this.cameraX = (float) cameraPos.x;
-        this.cameraY = (float) cameraPos.y;
         this.cameraZ = (float) cameraPos.z;
 
         this.useFogCulling = false;
@@ -105,7 +92,7 @@ public class SectionCuller implements Culler {
         }
     }
 
-    @Override
+
     public void iterateChunks(Camera camera, FrustumExtended frustum, int frame, boolean spectator) {
         this.initSearch(camera, frustum, frame, spectator);
 
@@ -114,9 +101,6 @@ public class SectionCuller implements Culler {
         for (int i = 0; i < queue.size(); i++) {
             ChunkGraphInfo section = queue.getSection(i);
             Direction flow = queue.getDirection(i);
-
-            // TODO: @Kroppeb understand what this does
-            this.cullerInteractor.schedulePendingUpdates(section.getRenderSection());
 
             for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
                 if (this.isCulled(section, flow, dir)) {
@@ -138,7 +122,7 @@ public class SectionCuller implements Culler {
             return;
         }
 
-        if (!this.frustumChecker.getVisibility(info, this.frustum)) {
+        if (!info.isInsideFrustum(this.frustum)) {
             return;
         }
 
@@ -188,7 +172,7 @@ public class SectionCuller implements Culler {
                         continue;
                     }
 
-                    if (section.isCulledByFrustum(frustum)) {
+                    if (!section.isInsideFrustum(frustum)) {
                         continue;
                     }
 
@@ -217,9 +201,11 @@ public class SectionCuller implements Culler {
         }
 
         if (!renderSection.isEmpty()) {
-            this.cullerInteractor.addChunkToVisible(renderSection);
-            this.cullerInteractor.addEntitiesToRenderLists(renderSection);
+            this.cullingSystem.addVisibleChunk(renderSection);
         }
+
+        // TODO: figure out if we also need to do this even if the section is empty
+        this.cullingSystem.schedulePendingUpdates(renderSection);
     }
 
     private boolean isCulled(ChunkGraphInfo node, Direction from, Direction to) {
@@ -238,18 +224,6 @@ public class SectionCuller implements Culler {
     }
 
     public interface CullerInteractor {
-        RenderSection resolveSection(int chunkX, int chunkY, int chunkZ);
-
-        void addChunkToVisible(RenderSection render);
-
-        void addEntitiesToRenderLists(RenderSection render);
-
         void schedulePendingUpdates(RenderSection section);
-    }
-
-    public interface FrustumChecker {
-        void updateVisibility(FrustumExtended frustum);
-
-        boolean getVisibility(ChunkGraphInfo section, FrustumExtended frustum);
     }
 }

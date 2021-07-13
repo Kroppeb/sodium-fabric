@@ -2,22 +2,19 @@ package me.jellysquid.mods.sodium.client.render.chunk;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
+import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.base.*;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuilder;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
-import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderBuildTask;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderEmptyBuildTask;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderRebuildTask;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
-import me.jellysquid.mods.sodium.client.world.ChunkStatusListener;
 import me.jellysquid.mods.sodium.client.world.ClientChunkManagerExtended;
 import me.jellysquid.mods.sodium.client.world.WorldSlice;
 import me.jellysquid.mods.sodium.client.world.cloned.ChunkRenderContext;
@@ -26,7 +23,6 @@ import me.jellysquid.mods.sodium.common.util.ListUtil;
 import me.jellysquid.mods.sodium.common.util.collections.FutureQueueDrainingIterator;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -39,7 +35,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-public class RenderSectionManager implements ChunkStatusListener, SectionCuller.CullerInteractor {
+public class DefaultRenderSectionManager implements RenderSectionManager {
     /**
      * The maximum distance a chunk can be from the player's camera in order to be eligible for blocking updates.
      */
@@ -47,7 +43,6 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
 
 
     private final ChunkBuilder builder;
-    private final ChunkRenderer chunkRenderer;
 
     private final RenderSectionContainer renderSectionContainer;
     private final ClonedChunkSectionCache sectionCache;
@@ -56,15 +51,9 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
 
     private final ChunkAdjacencyMap adjacencyMap = new ChunkAdjacencyMap();
 
-    private final ChunkVisibilityListener chunkRenderList;
-
-    private final ObjectList<RenderSection> tickableChunks = new ObjectArrayList<>();
-    private final ObjectList<BlockEntity> visibleBlockEntities = new ObjectArrayList<>();
-
     private final Set<BlockEntity> globalBlockEntities = new ObjectOpenHashSet<>();
 
     private final ClientWorld world;
-    private final SectionListener cullerSectionListener;
 
     private float cameraX, cameraY, cameraZ;
 
@@ -72,20 +61,20 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
 
     private int currentFrame = 0;
 
-    private final Culler culler;
+    private final VisibilityTracker visibilityTracker;
 
-    public RenderSectionManager(
-            ChunkRenderer chunkRenderer,
+    public DefaultRenderSectionManager(
+            VisibilityTracker visibilityTracker,
+            ChunkVertexType chunkVertexType,
             BlockRenderPassManager renderPassManager,
             ClientWorld world,
-            Culler culler,
             RenderSectionContainer renderSectionContainer) {
-        this.chunkRenderer = chunkRenderer;
         this.world = world;
 
-        this.builder = new ChunkBuilder(chunkRenderer.getVertexType());
+        this.builder = new ChunkBuilder(chunkVertexType);
         this.prioritizableBuilder = new PrioritizableBuilder(this.builder, this::createRebuildTask);
-        this.chunkRenderList = chunkRenderer.getChunkVisibilityListener();
+        this.visibilityTracker = visibilityTracker;
+        this.visibilityTracker.setRenderSectionManager(this);
         this.builder.init(world, renderPassManager);
 
         this.needsUpdate = true;
@@ -93,12 +82,6 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         // todo: provide dynamically
         this.renderSectionContainer = renderSectionContainer;
         this.sectionCache = new ClonedChunkSectionCache(this.world);
-
-        this.culler = culler;
-        this.culler.setCullerInteractor(this);
-        this.culler.setFrustumChecker(renderSectionContainer);
-
-        this.cullerSectionListener = this.culler.getListener();
     }
 
     public void loadChunks() {
@@ -119,9 +102,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.renderSectionContainer.updateVisibility(frustum);
 
         this.setup(camera);
-        this.culler.setup(camera);
         this.currentFrame = frame;
-        this.culler.iterateChunks(camera, frustum, frame, spectator);
 
         this.needsUpdate = false;
     }
@@ -134,6 +115,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.cameraZ = (float) cameraPos.z;
     }
 
+    @Override
     public void schedulePendingUpdates(RenderSection section) {
         if (section.getPendingUpdate() == null || !this.adjacencyMap.hasNeighbors(section.getChunkX(), section.getChunkZ())) {
             return;
@@ -142,37 +124,9 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.prioritizableBuilder.schedulePendingUpdates(section);
     }
 
-    @Override
-    public RenderSection resolveSection(int chunkX, int chunkY, int chunkZ) {
-        return this.getRenderSection(chunkX, chunkY, chunkZ);
-    }
-
-    public void addChunkToVisible(RenderSection render) {
-        this.chunkRenderList.add(render);
-
-        if (render.isTickable()) {
-            this.tickableChunks.add(render);
-        }
-    }
-
-    public void addEntitiesToRenderLists(RenderSection render) {
-        Collection<BlockEntity> blockEntities = render.getData().getBlockEntities();
-
-        if (!blockEntities.isEmpty()) {
-            this.visibleBlockEntities.addAll(blockEntities);
-        }
-    }
 
     private void resetLists() {
         this.prioritizableBuilder.clear();
-
-        this.visibleBlockEntities.clear();
-        this.chunkRenderList.clear();
-        this.tickableChunks.clear();
-    }
-
-    public Collection<BlockEntity> getVisibleBlockEntities() {
-        return this.visibleBlockEntities;
     }
 
     @Override
@@ -196,7 +150,7 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
     private boolean loadSection(int x, int y, int z) {
         RenderSection renderSection = this.renderSectionContainer.createSection(this, x, y, z);
 
-        this.cullerSectionListener.addSection(renderSection);
+        this.visibilityTracker.addSection(renderSection);
 
         Chunk chunk = this.world.getChunk(x, z);
         ChunkSection section = chunk.getSectionArray()[this.world.sectionCoordToIndex(y)];
@@ -217,33 +171,22 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
             throw new IllegalStateException("Chunk is not loaded: " + ChunkSectionPos.asLong(x, y, z));
         }
 
-        this.cullerSectionListener.removeSection(renderSection);
+        this.visibilityTracker.removeSection(renderSection);
 
         return true;
     }
 
-    public void renderLayer(MatrixStack matrixStack, BlockRenderPass pass, double x, double y, double z) {
-        RenderDevice device = RenderDevice.INSTANCE;
-        CommandList commandList = device.createCommandList();
-
-        this.chunkRenderer.render(matrixStack, commandList, pass, new ChunkCameraContext(x, y, z));
-
-        commandList.flush();
+    @Override
+    @Deprecated
+    public Collection<? extends String> getRenderSectionContainerMemoryDebugStrings() {
+        return this.renderSectionContainer.getMemoryDebugStrings();
     }
 
-    public void tickVisibleRenders() {
-        for (RenderSection render : this.tickableChunks) {
-            render.tick();
-        }
-    }
-
-    public boolean isSectionVisible(int x, int y, int z) {
-        return this.culler.isSectionVisible(x,y,z, this.currentFrame);
-    }
-
+    @Override
     public void updateChunks() {
         PriorityQueue<? extends CompletableFuture<? extends ChunkBuildResult>> blockingFutures = this.prioritizableBuilder.submitRebuildTasks(ChunkUpdateType.IMPORTANT_REBUILD);
 
+        // TODO this is before we
         this.prioritizableBuilder.submitRebuildTasks(ChunkUpdateType.INITIAL_BUILD);
         this.prioritizableBuilder.submitRebuildTasks(ChunkUpdateType.REBUILD);
 
@@ -251,11 +194,13 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.needsUpdate |= this.performPendingUploads();
 
         if (!blockingFutures.isEmpty()) {
+            this.needsUpdate = true;
             this.renderSectionContainer.upload(
                     RenderDevice.INSTANCE.createCommandList(),
                     new FutureQueueDrainingIterator<>(blockingFutures));
         }
 
+        // TODO: can't this be moved before the upload, while we might be waiting?
         this.renderSectionContainer.cleanup();
     }
 
@@ -292,10 +237,8 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         return this.needsUpdate;
     }
 
-    public ChunkBuilder getBuilder() {
-        return this.builder;
-    }
 
+    @Override
     public void destroy() {
         this.resetLists();
 
@@ -306,12 +249,13 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
         this.builder.stopWorkers();
     }
 
-    public int getTotalSections() {
-        return this.renderSectionContainer.getTotalSectionCount();
+    @Override
+    public boolean isBuildQueueEmpty() {
+        return this.builder.isBuildQueueEmpty();
     }
 
-    public int getVisibleChunkCount() {
-        return this.chunkRenderList.getCount();
+    public int getTotalSections() {
+        return this.renderSectionContainer.getTotalSectionCount();
     }
 
     public void scheduleRebuild(int x, int y, int z, boolean important) {
@@ -345,16 +289,12 @@ public class RenderSectionManager implements ChunkStatusListener, SectionCuller.
 
         if (node != null) {
             // todo: can this ever be not null?
-            this.cullerSectionListener.updateSection(node);
+            this.visibilityTracker.updateSection(node);
         }
     }
 
     private RenderSection getRenderSection(int x, int y, int z) {
         return this.renderSectionContainer.get(x, y, z);
-    }
-
-    public RenderSectionContainer getRenderSectionContainer() {
-        return this.renderSectionContainer;
     }
 
     public Set<? extends BlockEntity> getGlobalBlockEntities() {

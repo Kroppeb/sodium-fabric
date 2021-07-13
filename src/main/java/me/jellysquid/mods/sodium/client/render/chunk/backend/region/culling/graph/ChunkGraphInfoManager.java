@@ -1,11 +1,10 @@
-package me.jellysquid.mods.sodium.client.render.chunk;
+package me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.base.SectionListener;
-import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.Direction;
@@ -15,7 +14,6 @@ public class ChunkGraphInfoManager implements SectionListener {
 
     @Override
     public void addSection(RenderSection section) {
-        // TODO verify if null?
         ChunkGraphInfo value = new ChunkGraphInfo(section);
         ChunkGraphInfo old = this.sections.put(section.getChunkPosAsLong(), value);
         if (old != null) {

@@ -2,12 +2,13 @@ package me.jellysquid.mods.sodium.client.render.chunk.base;
 
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkUpdateType;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
+import me.jellysquid.mods.sodium.client.render.chunk.DefaultRenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.render.texture.SpriteUtil;
+import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -21,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
  * data about the render in the chunk visibility graph.
  */
 public class RenderSection {
-    private final RenderSectionManager renderSectionManager;
+    private final DefaultRenderSectionManager renderSectionManager;
     private final int chunkX, chunkY, chunkZ;
 
     private final Map<BlockRenderPass, ChunkGraphicsState> graphicsStates;
@@ -36,7 +37,7 @@ public class RenderSection {
 
     private int lastAcceptedBuildTime = -1;
 
-    public RenderSection(RenderSectionManager renderSectionManager, int chunkX, int chunkY, int chunkZ) {
+    public RenderSection(DefaultRenderSectionManager renderSectionManager, int chunkX, int chunkY, int chunkZ) {
         this.renderSectionManager = renderSectionManager;
 
         this.chunkX = chunkX;
@@ -271,5 +272,13 @@ public class RenderSection {
     public void onBuildFinished(ChunkBuildResult result) {
         this.setData(result.data);
         this.lastAcceptedBuildTime = result.buildTime;
+    }
+
+    public boolean isInsideFrustum(FrustumExtended frustum){
+        float x = this.getOriginX();
+        float y = this.getOriginY();
+        float z = this.getOriginZ();
+
+        return frustum.fastAabbTest(x, y, z, x + 16.0f, y + 16.0f, z + 16.0f);
     }
 }

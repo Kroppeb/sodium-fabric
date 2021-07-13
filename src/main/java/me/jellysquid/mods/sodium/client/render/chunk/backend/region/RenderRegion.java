@@ -2,8 +2,8 @@ package me.jellysquid.mods.sodium.client.render.chunk.backend.region;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
+import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
-import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
@@ -15,7 +15,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 
-public class RenderRegion {
+public final class RenderRegion {
     public static final int REGION_WIDTH = 8;
     public static final int REGION_HEIGHT = 4;
     public static final int REGION_LENGTH = 8;
@@ -36,7 +36,7 @@ public class RenderRegion {
         Validate.isTrue(MathUtil.isPowerOfTwo(REGION_LENGTH));
     }
 
-    private final ChunkRenderer renderer;
+    private final ChunkVertexType vertexType;
 
     private final Set<RenderSection> chunks = new ObjectOpenHashSet<>();
     private final Map<BlockRenderPass, BiBufferArenas> arenas = new EnumMap<>(BlockRenderPass.class);
@@ -45,16 +45,16 @@ public class RenderRegion {
 
     private RenderRegionVisibility visibility;
 
-    public RenderRegion(ChunkRenderer renderer, int x, int y, int z) {
-        this.renderer = renderer;
+    private RenderRegion(ChunkVertexType vertexType, int x, int y, int z) {
+        this.vertexType = vertexType;
 
         this.x = x;
         this.y = y;
         this.z = z;
     }
 
-    public static RenderRegion createRegionForChunk(ChunkRenderer renderer, int x, int y, int z) {
-        return new RenderRegion(renderer, x >> REGION_WIDTH_SH, y >> REGION_HEIGHT_SH, z >> REGION_LENGTH_SH);
+    public static RenderRegion createRegionForChunk(ChunkVertexType vertexType, int x, int y, int z) {
+        return new RenderRegion(vertexType, x >> REGION_WIDTH_SH, y >> REGION_HEIGHT_SH, z >> REGION_LENGTH_SH);
     }
 
     public BiBufferArenas getArenas(BlockRenderPass pass) {
@@ -89,7 +89,7 @@ public class RenderRegion {
         BiBufferArenas arenas = this.arenas.get(pass);
 
         if (arenas == null) {
-            this.arenas.put(pass, arenas = new BiBufferArenas(commandList, this.renderer.getVertexType(), 1024));
+            this.arenas.put(pass, arenas = new BiBufferArenas(commandList, this.vertexType, 1024));
         }
 
         return arenas;

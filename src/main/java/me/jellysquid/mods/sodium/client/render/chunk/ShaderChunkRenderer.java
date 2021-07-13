@@ -81,10 +81,4 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         this.programs.clear();
         this.chunkShaderManager.delete();
     }
-
-    @Override
-    @Deprecated
-    public ChunkVertexType getVertexType() {
-        return this.vertexType;
-    }
 }

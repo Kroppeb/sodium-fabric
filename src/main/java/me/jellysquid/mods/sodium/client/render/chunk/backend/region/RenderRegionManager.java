@@ -7,27 +7,30 @@ import me.jellysquid.mods.sodium.client.gl.arena.GlBufferArena;
 import me.jellysquid.mods.sodium.client.gl.buffer.IndexedVertexData;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
+import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSectionManager;
-import me.jellysquid.mods.sodium.client.render.chunk.SectionCuller;
-import me.jellysquid.mods.sodium.client.render.chunk.base.*;
+import me.jellysquid.mods.sodium.client.render.chunk.DefaultRenderSectionManager;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.SectionCuller;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph.ChunkGraphInfo;
+import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
+import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
+import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkMeshData;
-import me.jellysquid.mods.sodium.client.render.chunk.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import net.minecraft.util.math.ChunkSectionPos;
 
 import java.util.*;
 
-public class RenderRegionManager implements RenderSectionContainer, SectionCuller.FrustumChecker {
+public class RenderRegionManager implements RenderSectionContainer {
     private final Long2ReferenceOpenHashMap<RenderRegion> regions = new Long2ReferenceOpenHashMap<>();
     private final Long2ReferenceMap<RegionalRenderSection> sections = new Long2ReferenceOpenHashMap<>();
 
-    private final ChunkRenderer renderer;
+    private final ChunkVertexType vertexType;
 
-    public RenderRegionManager(ChunkRenderer renderer) {
-        this.renderer = renderer;
+    public RenderRegionManager(ChunkVertexType vertexType) {
+        this.vertexType = vertexType;
     }
 
     @Override
@@ -37,20 +40,6 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
                 region.updateVisibility(frustum);
             }
         }
-    }
-
-    @Override
-    public boolean getVisibility(ChunkGraphInfo info, FrustumExtended frustum) {
-        RenderRegionVisibility parentVisibility = this.getRegionForSection(info.getRenderSection()).getVisibility();
-        return parentVisibility == RenderRegionVisibility.FULLY_VISIBLE ||
-                parentVisibility == RenderRegionVisibility.VISIBLE &&
-                        !info.isCulledByFrustum(frustum);
-    }
-
-    private RenderRegion getRegionForSection(RenderSection section) {
-        // TODO: we could use generics to have a class `RenderSection` and a subclass `RegionalRenderSection`
-        //       or add a map from RenderSection to RenderRegion
-        return this.getRenderRegionForChunkSection(section.getChunkX(), section.getChunkY(), section.getChunkZ());
     }
 
     @Override
@@ -169,7 +158,7 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
         RenderRegion region = this.regions.get(key);
 
         if (region == null) {
-            this.regions.put(key, region = RenderRegion.createRegionForChunk(this.renderer, x, y, z));
+            this.regions.put(key, region = RenderRegion.createRegionForChunk(this.vertexType, x, y, z));
         }
 
         return region;
@@ -209,7 +198,7 @@ public class RenderRegionManager implements RenderSectionContainer, SectionCulle
     }
 
     @Override
-    public RegionalRenderSection createSection(RenderSectionManager renderSectionManager, int x, int y, int z) {
+    public RegionalRenderSection createSection(DefaultRenderSectionManager renderSectionManager, int x, int y, int z) {
 
         // Get region for the render section
         RenderRegion region = this.createRegionForChunk(x, y, z);

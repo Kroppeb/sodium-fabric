@@ -2,11 +2,12 @@ package me.jellysquid.mods.sodium.client.render.chunk.backend.advanced;
 
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
-import me.jellysquid.mods.sodium.client.render.chunk.*;
+import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
+import me.jellysquid.mods.sodium.client.render.chunk.DefaultRenderSectionManager;
 import me.jellysquid.mods.sodium.client.render.chunk.base.BackendProvider;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.base.Culler;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
+import me.jellysquid.mods.sodium.client.render.chunk.base.VisibilityTracker;
 import me.jellysquid.mods.sodium.client.render.chunk.format.sfp.ModelVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
 import net.minecraft.client.world.ClientWorld;
@@ -28,17 +29,12 @@ public final class AdvancedBackendProvider implements BackendProvider {
     }
 
     @Override
-    public Culler createCuller(ClientWorld world, int renderDistance) {
+    public RenderSectionContainer createRenderSectionContainer(ChunkVertexType chunkVertexType) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public RenderSectionContainer createRenderSectionContainer(ChunkRenderer chunkRenderer) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public RenderSectionManager createRenderSectionManager(ChunkRenderer chunkRenderer, BlockRenderPassManager renderPassManager, ClientWorld world, Culler culler, RenderSectionContainer renderSectionContainer) {
+    public DefaultRenderSectionManager createRenderSectionManager(VisibilityTracker visibilityTracker, ChunkVertexType chunkVertexType, BlockRenderPassManager renderPassManager, ClientWorld world, RenderSectionContainer renderSectionContainer) {
         throw new UnsupportedOperationException();
     }
 }
