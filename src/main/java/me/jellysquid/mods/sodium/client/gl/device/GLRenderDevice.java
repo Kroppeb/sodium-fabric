@@ -12,6 +12,7 @@ import org.lwjgl.opengl.*;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 
 public class GLRenderDevice implements RenderDevice {
     private final GlStateTracker stateTracker = new GlStateTracker();
@@ -82,6 +83,34 @@ public class GLRenderDevice implements RenderDevice {
         }
 
         @Override
+        public void uploadData(GlMutableBuffer glBuffer, ShortBuffer shortBuffer, GlBufferUsage usage) {
+            this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
+
+            if (shortBuffer == null) {
+                GL20C.glBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), 0L, usage.getId());
+                glBuffer.setSize(0L);
+            } else {
+                GL20C.glBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), shortBuffer, usage.getId());
+                glBuffer.setSize((long) shortBuffer.remaining() << 1);
+            }
+        }
+
+        @Override
+        public void uploadDataBase(
+                GlBufferTarget target, int index, GlMutableBuffer glBuffer, ByteBuffer byteBuffer, GlBufferUsage usage) {
+
+            this.bindBufferBase(target, index, glBuffer);
+
+            if (byteBuffer == null) {
+                GL20C.glBufferData(target.getTargetParameter(), 0L, usage.getId());
+                glBuffer.setSize(0L);
+            } else {
+                GL20C.glBufferData(target.getTargetParameter(), byteBuffer, usage.getId());
+                glBuffer.setSize(byteBuffer.remaining());
+            }
+        }
+
+        @Override
         public void copyBufferSubData(GlBuffer src, GlMutableBuffer dst, long readOffset, long writeOffset, long bytes) {
             if (writeOffset + bytes > dst.getSize()) {
                 throw new IllegalArgumentException("Not enough space in destination buffer (writeOffset + bytes > bufferSize)");
@@ -98,6 +127,32 @@ public class GLRenderDevice implements RenderDevice {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
                 GL20C.glBindBuffer(target.getTargetParameter(), buffer.handle());
             }
+        }
+
+        @Override
+        public void bindBufferBase(GlBufferTarget target, int index, GlBuffer buffer) {
+            this.stateTracker.makeBufferActive(target, buffer);
+
+            // TODO: use state tracker
+            GL32C.glBindBufferBase(target.getTargetParameter(), index, buffer.handle());
+        }
+
+        @Override
+        public void createData(GlBufferTarget target, GlMutableBuffer buffer, long size, GlBufferUsage usage) {
+            this.bindBuffer(target, buffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), size, usage.getId());
+
+            buffer.setSize(size);
+        }
+
+        @Override
+        public void createDataBase(GlBufferTarget target, int index, GlMutableBuffer buffer, long size, GlBufferUsage usage) {
+            this.bindBufferBase(target, index, buffer);
+
+            GL20C.glBufferData(target.getTargetParameter(), size, usage.getId());
+
+            buffer.setSize(size);
         }
 
         @Override
@@ -132,7 +187,12 @@ public class GLRenderDevice implements RenderDevice {
             int handle = vertexArray.handle();
             vertexArray.invalidateHandle();
 
-            GL30C.glDeleteVertexArrays(handle);
+            GL32C.glDeleteVertexArrays(handle);
+        }
+
+        @Override
+        public void dispatchCompute(int x, int y, int z) {
+            GL46C.glDispatchCompute(x,y,z);
         }
 
         @Override

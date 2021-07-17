@@ -11,8 +11,15 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.nio.FloatBuffer;
+
 @Mixin(Frustum.class)
 public class MixinFrustum implements FrustumExtended {
+    private Matrix4f modelViewMatrix;
+    private Matrix4f projectionMatrix;
+    private Matrix4f projectionModelViewMatrix;
+
+
     private float xF, yF, zF;
 
     private float nxX, nxY, nxZ, nxW;
@@ -21,6 +28,19 @@ public class MixinFrustum implements FrustumExtended {
     private float pyX, pyY, pyZ, pyW;
     private float nzX, nzY, nzZ, nzW;
     private float pzX, pzY, pzZ, pzW;
+
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void postInit(
+            Matrix4f modelViewMatrix,
+            Matrix4f projectionMatrix,
+            CallbackInfo ci){
+        this.modelViewMatrix = modelViewMatrix;
+        this.projectionMatrix = projectionMatrix;
+        this.projectionModelViewMatrix = projectionMatrix.copy();
+        this.projectionModelViewMatrix.multiply(modelViewMatrix);
+    }
+
 
     @Inject(method = "setPosition", at = @At("HEAD"))
     private void prePositionUpdate(double cameraX, double cameraY, double cameraZ, CallbackInfo ci) {
@@ -126,5 +146,48 @@ public class MixinFrustum implements FrustumExtended {
         }
 
         return RenderRegionVisibility.CULLED;
+    }
+
+    @Override
+    public void writeToBuffer(FloatBuffer buffer) {
+        buffer.put(this.nxX);
+        buffer.put(this.nxY);
+        buffer.put(this.nxZ);
+        buffer.put(this.nxW);
+        buffer.put(this.pxX);
+        buffer.put(this.pxY);
+        buffer.put(this.pxZ);
+        buffer.put(this.pxW);
+        buffer.put(this.nyX);
+        buffer.put(this.nyY);
+        buffer.put(this.nyZ);
+        buffer.put(this.nyW);
+        buffer.put(this.pyX);
+        buffer.put(this.pyY);
+        buffer.put(this.pyZ);
+        buffer.put(this.pyW);
+        buffer.put(this.nzX);
+        buffer.put(this.nzY);
+        buffer.put(this.nzZ);
+        buffer.put(this.nzW);
+        buffer.put(this.pzX);
+        buffer.put(this.pzY);
+        buffer.put(this.pzZ);
+        buffer.put(this.pzW);
+    }
+
+    @Override
+    public Matrix4f getModelViewMatrix() {
+        return this.modelViewMatrix;
+    }
+
+    @Override
+    public Matrix4f getProjectionMatrix() {
+        return this.projectionMatrix;
+    }
+
+    @Override
+    public Matrix4f getProjectionModelViewMatrix() {
+        return this.projectionModelViewMatrix;
     }
 }

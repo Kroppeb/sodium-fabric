@@ -234,6 +234,18 @@ public class SodiumGameOptionPages {
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                    .setName("Use OpenGl 4.6 renderer")
+                        .setControl(TickBoxControl::new)
+                        .setTooltip("Hi")
+                        .setImpact(OptionImpact.HIGH)
+                        .setBinding((opts, value) -> opts.advanced.use46Renderer = value, opts -> opts.advanced.use46Renderer)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
+                        .build()
+                )
+                .build());
+
+        groups.add(OptionGroup.createBuilder()
+                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
                         .setName("Use Block Face Culling")
                         .setTooltip("If enabled, only the sides of blocks which are facing the camera will be submitted for rendering. This can eliminate " +
                                 "a large number of block faces very early in the rendering process, saving memory bandwidth and time on the GPU. Some resource " +

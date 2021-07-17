@@ -3,7 +3,6 @@ package me.jellysquid.mods.sodium.client.gui;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gui.options.TextProvider;
 import net.minecraft.client.option.GraphicsMode;
 
@@ -21,6 +20,7 @@ public class SodiumGameOptions {
     private Path configPath;
 
     public static class AdvancedSettings {
+        public boolean use46Renderer = false;
         public boolean animateOnlyVisibleTextures = true;
         public boolean useEntityCulling = true;
         public boolean useParticleCulling = true;

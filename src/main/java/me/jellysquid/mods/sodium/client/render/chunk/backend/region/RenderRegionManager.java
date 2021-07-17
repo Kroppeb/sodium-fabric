@@ -10,9 +10,8 @@ import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
 import me.jellysquid.mods.sodium.client.render.chunk.DefaultRenderSectionManager;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.SectionCuller;
-import me.jellysquid.mods.sodium.client.render.chunk.backend.region.culling.graph.ChunkGraphInfo;
 import me.jellysquid.mods.sodium.client.render.chunk.base.BiBufferArenas;
+import me.jellysquid.mods.sodium.client.render.chunk.base.PendingSectionUpload;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSection;
 import me.jellysquid.mods.sodium.client.render.chunk.base.RenderSectionContainer;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
@@ -111,8 +110,8 @@ public class RenderRegionManager implements RenderSectionContainer {
 
         BiBufferArenas arenas = region.getOrCreateArenas(commandList, pass);
 
-        boolean bufferChanged = arenas.vertexBuffers.upload(commandList, sectionUploads.stream().map(i -> i.vertexUpload));
-        bufferChanged |= arenas.indexBuffers.upload(commandList, sectionUploads.stream().map(i -> i.indicesUpload));
+        boolean bufferChanged = arenas.vertexBuffers.upload(commandList, sectionUploads.stream().map(PendingSectionUpload::vertexUpload));
+        bufferChanged |= arenas.indexBuffers.upload(commandList, sectionUploads.stream().map(PendingSectionUpload::indicesUpload));
 
         // If any of the buffers changed, the tessellation will need to be updated
         // Once invalidated the tessellation will be re-created on the next attempted use
@@ -122,7 +121,7 @@ public class RenderRegionManager implements RenderSectionContainer {
 
         // Collect the upload results
         for (PendingSectionUpload upload : sectionUploads) {
-            upload.section.setGraphicsState(pass, new ChunkGraphicsState(upload.vertexUpload.getResult(), upload.indicesUpload.getResult(), upload.meshData));
+            upload.section().setGraphicsState(pass, new ChunkGraphicsState(upload.vertexUpload().getResult(), upload.indicesUpload().getResult(), upload.meshData()));
         }
     }
 
@@ -175,6 +174,7 @@ public class RenderRegionManager implements RenderSectionContainer {
         }
 
         this.regions.clear();
+        this.sections.clear();
     }
 
     public Collection<RenderRegion> getLoadedRegions() {
@@ -182,20 +182,7 @@ public class RenderRegionManager implements RenderSectionContainer {
     }
 
 
-    private static final class PendingSectionUpload {
-        private final RenderSection section;
-        private final ChunkMeshData meshData;
 
-        private final GlBufferArena.PendingUpload vertexUpload;
-        private final GlBufferArena.PendingUpload indicesUpload;
-
-        private PendingSectionUpload(RenderSection section, ChunkMeshData meshData, GlBufferArena.PendingUpload vertexUpload, GlBufferArena.PendingUpload indicesUpload) {
-            this.section = section;
-            this.meshData = meshData;
-            this.vertexUpload = vertexUpload;
-            this.indicesUpload = indicesUpload;
-        }
-    }
 
     @Override
     public RegionalRenderSection createSection(DefaultRenderSectionManager renderSectionManager, int x, int y, int z) {
@@ -237,6 +224,7 @@ public class RenderRegionManager implements RenderSectionContainer {
 
     @Override
     public int getTotalSectionCount() {
+        // TODO: isn't this just this.sections.size()
         int sum = 0;
 
         for (RenderRegion renderRegion : this.regions.values()) {

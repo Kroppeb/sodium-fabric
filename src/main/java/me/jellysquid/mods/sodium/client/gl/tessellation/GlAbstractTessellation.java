@@ -5,6 +5,7 @@ import me.jellysquid.mods.sodium.client.gl.buffer.GlBuffer;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferTarget;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL46C;
 
 public abstract class GlAbstractTessellation implements GlTessellation {
     protected final GlPrimitiveType primitiveType;
@@ -29,12 +30,16 @@ public abstract class GlAbstractTessellation implements GlTessellation {
             for (GlVertexAttributeBinding attrib : binding.attributeBindings()) {
                 GL20C.glVertexAttribPointer(attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
                         attrib.getStride(), attrib.getPointer());
+
+                if(attrib.getDivisor() != 0){
+                    GL46C.glVertexAttribDivisor(attrib.getIndex(), attrib.getDivisor());
+                }
                 GL20C.glEnableVertexAttribArray(attrib.getIndex());
             }
         }
 
         if (this.indexBuffer != null) {
-            commandList.bindBuffer(GlBufferTarget.ELEMENT_BUFFER, this.indexBuffer);
+            commandList.bindBuffer(GlBufferTarget.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         }
     }
 }

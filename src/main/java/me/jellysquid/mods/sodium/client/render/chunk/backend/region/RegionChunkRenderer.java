@@ -197,9 +197,9 @@ public class RegionChunkRenderer extends ShaderChunkRenderer {
     private void pushCameraTranslation(RenderRegion region, ChunkCameraContext camera) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             FloatBuffer fb = stack.mallocFloat(3);
-            fb.put(0, getCameraTranslation(region.getOriginX(), camera.blockX, camera.deltaX));
-            fb.put(1, getCameraTranslation(region.getOriginY(), camera.blockY, camera.deltaY));
-            fb.put(2, getCameraTranslation(region.getOriginZ(), camera.blockZ, camera.deltaZ));
+            fb.put(0, camera.getCameraXTranslation(region.getOriginX()));
+            fb.put(1, camera.getCameraYTranslation(region.getOriginY()));
+            fb.put(2, camera.getCameraZTranslation(region.getOriginZ()));
 
             GL20C.glUniform3fv(this.activeProgram.uCameraTranslation, fb);
         }

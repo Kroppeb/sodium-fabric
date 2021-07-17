@@ -249,7 +249,7 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
                 ChunkModelVertexFormats.DEFAULT,
                 this.renderPassManager,
                 this.world,
-                backendProvider.createRenderSectionContainer(ChunkModelVertexFormats.DEFAULT));
+                backendProvider.createRenderSectionContainer(ChunkModelVertexFormats.DEFAULT, this.renderDistance));
 
         this.renderSectionManager.loadChunks();
         this.pipeline = new Pipeline(this.renderSectionManager, visibilityTracker, chunkRenderer);
@@ -399,5 +399,10 @@ public final class SodiumWorldRenderer implements ChunkStatusListener {
 
     private static long toMib(long x) {
         return x / 1024L / 1024L;
+    }
+
+    // I'm just using this to get the profiles =/
+    public ClientWorld getWorld() {
+        return this.world;
     }
 }

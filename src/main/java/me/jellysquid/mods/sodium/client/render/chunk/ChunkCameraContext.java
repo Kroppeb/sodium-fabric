@@ -20,4 +20,21 @@ public class ChunkCameraContext {
         this.posZ = (float) z;
     }
 
+    private static float getCameraTranslation(int chunkBlockPos, int cameraBlockPos, float cameraPos) {
+        return (chunkBlockPos - cameraBlockPos) - cameraPos;
+    }
+
+    public float getCameraXTranslation(int x) {
+        return getCameraTranslation(x, this.blockX, this.deltaX);
+    }
+
+    public float getCameraYTranslation(int y) {
+        return getCameraTranslation(y, this.blockY, this.deltaY);
+    }
+
+    public float getCameraZTranslation(int z) {
+        return getCameraTranslation(z, this.blockZ, this.deltaZ);
+    }
+
+
 }

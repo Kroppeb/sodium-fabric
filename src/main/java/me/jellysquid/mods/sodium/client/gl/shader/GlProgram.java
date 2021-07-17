@@ -41,7 +41,7 @@ public abstract class GlProgram extends GlObject {
         int index = GL20C.glGetUniformLocation(this.handle(), name);
 
         if (index < 0) {
-            throw new NullPointerException("No uniform exists with name: " + name);
+            // throw new NullPointerException("No uniform exists with name: " + name);
         }
 
         return index;
@@ -63,7 +63,7 @@ public abstract class GlProgram extends GlObject {
         int index = GL32C.glGetUniformBlockIndex(this.handle(), name);
 
         if (index < 0) {
-            throw new NullPointerException("No uniform block exists with name: " + name);
+            //throw new NullPointerException("No uniform block exists with name: " + name);
         }
 
         return index;

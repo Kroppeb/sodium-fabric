@@ -9,5 +9,7 @@ public class ChunkShaderBindingPoints {
     public static final ShaderBindingPoint ATTRIBUTE_BLOCK_TEXTURE = new ShaderBindingPoint(3);
     public static final ShaderBindingPoint ATTRIBUTE_LIGHT_TEXTURE = new ShaderBindingPoint(4);
 
+    public static final ShaderBindingPoint ATTRIBUTE_CHUNK_OFFSET = new ShaderBindingPoint(5);
+
     public static final ShaderBindingPoint FRAG_COLOR = new ShaderBindingPoint(0);
 }

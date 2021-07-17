@@ -30,7 +30,7 @@ public final class RegionBackendProvider implements BackendProvider {
 
 
     @Override
-    public RenderSectionContainer createRenderSectionContainer(ChunkVertexType chunkVertexType) {
+    public RenderSectionContainer createRenderSectionContainer(ChunkVertexType chunkVertexType, int renderDistance) {
         return new RenderRegionManager(chunkVertexType);
     }
 

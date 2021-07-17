@@ -23,7 +23,7 @@ public interface BackendProvider {
 
     ChunkRenderer createChunkRenderer(RenderDevice device, ModelVertexType vertexType);
 
-    RenderSectionContainer createRenderSectionContainer(ChunkVertexType chunkVertexType);
+    RenderSectionContainer createRenderSectionContainer(ChunkVertexType chunkVertexType, int renderDistance);
 
     RenderSectionManager createRenderSectionManager(
             VisibilityTracker visibilityTracker,

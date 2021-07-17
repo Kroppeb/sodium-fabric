@@ -13,7 +13,7 @@ public class BiBufferArenas {
 
     public BiBufferArenas(CommandList commandList, ChunkVertexType vertexType, long size) {
         this.vertexBuffers = new GlBufferArena(commandList, 24 * size, vertexType.getBufferVertexFormat().getStride());
-        this.indexBuffers = new GlBufferArena(commandList, 6 * size, 4);
+        this.indexBuffers = new GlBufferArena(commandList, 36 * size, 4);
     }
 
     public void delete(CommandList commandList) {

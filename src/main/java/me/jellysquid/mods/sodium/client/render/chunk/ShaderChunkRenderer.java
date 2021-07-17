@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexFormat;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
+import me.jellysquid.mods.sodium.client.render.chunk.backend.advanced.gpuculled.TornadoChunkRender;
 import me.jellysquid.mods.sodium.client.render.chunk.base.ChunkRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkMeshAttribute;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
@@ -45,7 +46,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         if (program == null) {
             programs.put(options, program = this.chunkShaderManager.createShader(
-                    this.device, this.getShaderName(pass), options));
+                    this.getShaderName(pass), options));
         }
 
         return program;
@@ -64,7 +65,8 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
 
     protected void begin(BlockRenderPass pass, MatrixStack matrixStack) {
-        ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH);
+        // TODO: NO
+        ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH, this instanceof TornadoChunkRender);
 
         this.activeProgram = this.compileProgram(pass, options);
         this.activeProgram.bind();

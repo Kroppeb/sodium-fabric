@@ -287,7 +287,8 @@ public class GlBufferArena {
         }
 
         // Invalidate the staging buffer so that we don't leak memory
-        commandList.uploadData(this.stagingBuffer, null, GlBufferUsage.STREAM_DRAW);
+        // TODO fix this cast
+        commandList.uploadData(this.stagingBuffer, (ByteBuffer) null, GlBufferUsage.STREAM_DRAW);
 
         return this.arenaBuffer != buffer;
     }
