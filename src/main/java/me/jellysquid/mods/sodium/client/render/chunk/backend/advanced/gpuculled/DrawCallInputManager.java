@@ -125,84 +125,76 @@ public class DrawCallInputManager {
         }
     }
 
-    public long uploadPass(
-            CommandList commandList,
+    public int uploadPass(
             BlockRenderPass pass,
             GlVertexFormat<?> vertexFormat,
-            @Structured(ChunkMeshPassStruct) GlMutableBuffer meshInfoCommandBuffer,
+            @Structured(ChunkMeshPassStruct) ByteBuffer targetBuffer,
             ChunkCameraContext cameraContext
     ) {
-        int maxSize = 0;
         int meshCount = 0;
 
-        try (var stack = memoryStack.push()) {
-            var meshes = this.occlusionTracker.getNonEmptySections();
 
-            @Structured(ChunkMeshPassStruct) ByteBuffer buffer = stack.malloc(meshes.size() * ChunkMeshPassStruct.size);
+        var meshes = this.occlusionTracker.getNonEmptySections();
 
-
-            for (var entry : Long2ReferenceMaps.fastIterable(meshes)) {
-                RenderSection renderSection = entry.getValue();
-                ChunkGraphicsState data = renderSection.getGraphicsState(pass);
-
-                if (data == null) {
-                    continue;
-                }
+        if (targetBuffer.remaining() < meshes.size() * ChunkMeshPassStruct.size) {
+            throw new IllegalStateException("triple buffer is too small ?!?");
+        }
 
 
-                ChunkSectionPos chunkSectionPos = ChunkSectionPos.from(entry.getLongKey());
-                int chunkId = this.lastChunkId.getInt(chunkSectionPos);
+        for (var entry : Long2ReferenceMaps.fastIterable(meshes)) {
+            RenderSection renderSection = entry.getValue();
+            ChunkGraphicsState data = renderSection.getGraphicsState(pass);
 
-
-                buffer.putInt(chunkId);
-
-                int indexOffset = (int) data.getIndexSegment().getOffset();
-                int baseVertex = (int) data.getVertexSegment().getOffset();
-
-                for (var dir : ModelQuadFacing.VALUES) {
-                    var bufferSlice = data.getModelPart(dir);
-                    if (bufferSlice == null) {
-                        buffer.putInt(0);
-                        buffer.putInt(0);
-                        buffer.putInt(0);
-                    } else {
-                        meshCount++;
-
-                        int firstIndex = indexOffset + bufferSlice.elementOffset;
-                        int count = bufferSlice.elementCount;
-
-                        if (count > maxSize) {
-                            maxSize = count;
-                        }
-
-                        buffer.putInt(count);
-                        buffer.putInt(firstIndex);
-                        buffer.putInt(baseVertex);
-                    }
-                }
-
-                buffer.putInt(0); // vec3 needs to be aligned to 16 bytes;
-                buffer.putInt(0);
-
-                // default bounds atm
-                buffer.putFloat(cameraContext.getCameraXTranslation(chunkSectionPos.getMinX()) - .5f);
-                buffer.putFloat(cameraContext.getCameraYTranslation(chunkSectionPos.getMinY()) - .5f);
-                buffer.putFloat(cameraContext.getCameraZTranslation(chunkSectionPos.getMinZ()) - .5f);
-                buffer.putInt(0); // vec3 uses 4 floats
-
-                buffer.putFloat(cameraContext.getCameraXTranslation(chunkSectionPos.getMaxX()) + .5f);
-                buffer.putFloat(cameraContext.getCameraYTranslation(chunkSectionPos.getMaxY()) + .5f);
-                buffer.putFloat(cameraContext.getCameraZTranslation(chunkSectionPos.getMaxZ()) + .5f);
-                buffer.putInt(0); // vec3 uses 4 floats
-
+            if (data == null) {
+                continue;
             }
 
-            buffer.rewind();
 
-            commandList.uploadDataBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 3, meshInfoCommandBuffer, buffer, GlBufferUsage.STREAM_DRAW);
+            ChunkSectionPos chunkSectionPos = ChunkSectionPos.from(entry.getLongKey());
+            int chunkId = this.lastChunkId.getInt(chunkSectionPos);
 
-            return meshCount | ((long) maxSize << 32);
+
+            targetBuffer.putInt(chunkId);
+
+            int indexOffset = (int) data.getIndexSegment().getOffset();
+            int baseVertex = (int) data.getVertexSegment().getOffset();
+
+            for (var dir : ModelQuadFacing.VALUES) {
+                var bufferSlice = data.getModelPart(dir);
+                if (bufferSlice == null) {
+                    targetBuffer.putInt(0);
+                    targetBuffer.putInt(0);
+                    targetBuffer.putInt(0);
+                } else {
+                    meshCount++;
+
+                    int firstIndex = indexOffset + bufferSlice.elementOffset;
+                    int count = bufferSlice.elementCount;
+
+                    targetBuffer.putInt(count);
+                    targetBuffer.putInt(firstIndex);
+                    targetBuffer.putInt(baseVertex);
+                }
+            }
+
+            targetBuffer.putInt(0); // vec3 needs to be aligned to 16 bytes;
+            targetBuffer.putInt(0);
+
+            // default bounds atm
+            // TODO: get smaller bounds
+            targetBuffer.putFloat(cameraContext.getCameraXTranslation(chunkSectionPos.getMinX()) - .5f);
+            targetBuffer.putFloat(cameraContext.getCameraYTranslation(chunkSectionPos.getMinY()) - .5f);
+            targetBuffer.putFloat(cameraContext.getCameraZTranslation(chunkSectionPos.getMinZ()) - .5f);
+            targetBuffer.putInt(0); // vec3 uses 4 floats
+
+            targetBuffer.putFloat(cameraContext.getCameraXTranslation(chunkSectionPos.getMaxX()) + .5f);
+            targetBuffer.putFloat(cameraContext.getCameraYTranslation(chunkSectionPos.getMaxY()) + .5f);
+            targetBuffer.putFloat(cameraContext.getCameraZTranslation(chunkSectionPos.getMaxZ()) + .5f);
+            targetBuffer.putInt(0); // vec3 uses 4 floats
+
         }
+
+        return meshCount;
     }
 
 

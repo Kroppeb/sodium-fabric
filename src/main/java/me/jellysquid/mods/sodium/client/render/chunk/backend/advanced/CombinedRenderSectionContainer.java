@@ -17,10 +17,7 @@ import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
 import me.jellysquid.mods.sodium.common.util.ListUtil;
 import net.minecraft.util.math.ChunkSectionPos;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 public class CombinedRenderSectionContainer implements RenderSectionContainer {
     private BiBufferArenas arenas;
@@ -36,8 +33,12 @@ public class CombinedRenderSectionContainer implements RenderSectionContainer {
         IM_SORRY_I_JUST_WANT_STUFF_TO_RENDER_ATM = this;
     }
 
-    public static BiBufferArenas getTheFArenas(CommandList commandList){
+    public static BiBufferArenas getTheFArenas(CommandList commandList) {
         return IM_SORRY_I_JUST_WANT_STUFF_TO_RENDER_ATM.getOrCreateArenas(commandList);
+    }
+
+    public static EnumSet<BlockRenderPass> getTheFDirtyList() {
+        return IM_SORRY_I_JUST_WANT_STUFF_TO_RENDER_ATM.meshDataDirty;
     }
 
     public BiBufferArenas getOrCreateArenas(CommandList commandList) {
@@ -75,6 +76,11 @@ public class CombinedRenderSectionContainer implements RenderSectionContainer {
         return this.sections.get(ChunkSectionPos.asLong(x, y, z));
     }
 
+
+    public EnumSet<BlockRenderPass> meshDataDirty = EnumSet.noneOf(BlockRenderPass.class);
+    // TODO: is this really needed (here)?
+    private Map<RenderSection, EnumSet<BlockRenderPass>> visibleSectionPasses = new HashMap<>();
+
     @Override
     public void upload(CommandList commandList, Iterator<? extends ChunkBuildResult> chunkBuildResults) {
         List<ChunkBuildResult> uploadQueue = ListUtil.fromIterator(chunkBuildResults);
@@ -85,6 +91,25 @@ public class CombinedRenderSectionContainer implements RenderSectionContainer {
 
         for (ChunkBuildResult result : uploadQueue) {
             result.render.onBuildFinished(result);
+
+
+            if(result.meshes.isEmpty()) {
+                EnumSet<BlockRenderPass> blockRenderPasses = this.visibleSectionPasses.remove(result.render);
+                if (blockRenderPasses != null) {
+                    this.meshDataDirty.addAll(blockRenderPasses);
+                }
+            } else {
+                EnumSet<BlockRenderPass> blockRenderPasses = this.visibleSectionPasses.get(result.render);
+                if (blockRenderPasses != null) {
+                    this.meshDataDirty.addAll(blockRenderPasses);
+                    blockRenderPasses.clear();
+                    blockRenderPasses.addAll(result.meshes.keySet());
+                } else {
+                    blockRenderPasses = EnumSet.copyOf(result.meshes.keySet());
+                    this.meshDataDirty.addAll(blockRenderPasses);
+                    this.visibleSectionPasses.put(result.render, blockRenderPasses);
+                }
+            }
 
             result.delete();
         }
@@ -156,7 +181,7 @@ public class CombinedRenderSectionContainer implements RenderSectionContainer {
         List<String> list = new ArrayList<>();
 
 
-        if(this.arenas == null){
+        if (this.arenas == null) {
             list.add("Chunk Arenas: Awaiting creation");
         } else {
             list.add(String.format(

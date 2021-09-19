@@ -33,7 +33,7 @@ dependencies {
     modIncludeImplementation(fabricApi.module("fabric-rendering-fluids-v1", project.fabric_version))
     modIncludeImplementation(fabricApi.module("fabric-rendering-data-attachment-v1", project.fabric_version))
 }
-
+/*
 if (project.use_third_party_mods) {
     repositories {
         maven { url = "https://maven.gegy.dev" }
@@ -46,7 +46,7 @@ if (project.use_third_party_mods) {
             transitive = false
         }
     }
-}
+}*/
 
 processResources {
     inputs.property "version", project.version

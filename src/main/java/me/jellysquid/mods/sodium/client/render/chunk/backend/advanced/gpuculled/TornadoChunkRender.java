@@ -8,6 +8,7 @@ import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexAttributeFormat;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferTarget;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlBufferUsage;
 import me.jellysquid.mods.sodium.client.gl.buffer.GlMutableBuffer;
+import me.jellysquid.mods.sodium.client.gl.buffer.TripleBufferedPersistentMappedBuffer;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.gl.shader.GlProgram;
@@ -44,6 +45,8 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.EnumMap;
+import java.util.EnumSet;
 
 import static me.jellysquid.mods.sodium.client.render.chunk.backend.advanced.struct.Structs.*;
 
@@ -77,6 +80,10 @@ public class TornadoChunkRender extends ShaderChunkRenderer {
     GlMutableBuffer firstPassCommandBuffer;
     private final @Structured(DrawElementsIndirectCommandStruct)
     GlMutableBuffer secondPassCommandBuffer;
+    private final EnumMap<
+            BlockRenderPass,
+            @Structured(DrawElementsIndirectCommandStruct) GlMutableBuffer>
+            drawPassIndirectCommandBuffers;
 
 
     private final @Structured(ChunkMeshPassStruct)
@@ -87,8 +94,18 @@ public class TornadoChunkRender extends ShaderChunkRenderer {
 
     private final GlVertexArray drawChunkBoxPassVAO;
 
-    private final GlMutableBuffer atomicCounters;
+    private final @Structured(Int)
+    GlMutableBuffer atomicCounters;
+    private final @Structured(Int)
+    GlMutableBuffer parameterBuffer;
+
     private OcclusionTracker occlusionTracker;
+
+    private final EnumMap<
+            BlockRenderPass,
+            @Structured(ChunkMeshPassStruct) TripleBufferedPersistentMappedBuffer> meshLocationBuffers;
+
+    private EnumSet<BlockRenderPass> nonEmptyPasses;
 
     public TornadoChunkRender(
             RenderDevice device,
@@ -110,7 +127,9 @@ public class TornadoChunkRender extends ShaderChunkRenderer {
 
 
         int renderDistance = 2 * MinecraftClient.getInstance().options.viewDistance + 1;
+        // TODO get actual value!!!
         int height = 16; // can't get the exact value here I think. This is only for the initial size anyway
+        int maxChunkSections = height * renderDistance * renderDistance;
 
         this.vertexAttributeBindings = new GlVertexAttributeBinding[] {
                 new GlVertexAttributeBinding(ChunkShaderBindingPoints.ATTRIBUTE_POSITION_ID,
@@ -131,6 +150,23 @@ public class TornadoChunkRender extends ShaderChunkRenderer {
 
         try (CommandList commandList = device.createCommandList()) {
 
+            this.meshLocationBuffers = new EnumMap<>(BlockRenderPass.class);
+            this.drawPassIndirectCommandBuffers = new EnumMap<>(BlockRenderPass.class);
+            for (BlockRenderPass value : BlockRenderPass.VALUES) {
+                this.meshLocationBuffers.put(
+                        value,
+                        TripleBufferedPersistentMappedBuffer.create(
+                                commandList,
+                                maxChunkSections * ChunkMeshPassStruct.size,
+                                false, true
+                        )
+                );
+                this.drawPassIndirectCommandBuffers.put(
+                        value,
+                        commandList.createMutableBuffer()
+                );
+            }
+
             // create all the buffers
             // TODO: switch to buffer storage
             this.computeInputsBuffer = commandList.createMutableBuffer();
@@ -142,10 +178,17 @@ public class TornadoChunkRender extends ShaderChunkRenderer {
             this.secondPassCommandBuffer = commandList.createMutableBuffer();
             this.meshInfoCommandBuffer = commandList.createMutableBuffer();
             this.atomicCounters = commandList.createMutableBuffer();
+            this.parameterBuffer = commandList.createMutableBuffer();
 
             this.drawChunkBoxPassVAO = new GlVertexArray();
 
             this.createLameCube(commandList);
+
+            commandList.createData(
+                    GlBufferTarget.PARAMETER_BUFFER,
+                    this.parameterBuffer,
+                    1L + BlockRenderPass.COUNT << 2,
+                    GlBufferUsage.DYNAMIC_COPY);
 
             // region init drawChunkBoxPassVAO
             commandList.bindVertexArray(this.drawChunkBoxPassVAO);
@@ -554,65 +597,106 @@ public class TornadoChunkRender extends ShaderChunkRenderer {
         profiler.pop();
     }
 
+    private boolean updateDrawPassBuffer(
+            CommandList commandList,
+            BlockRenderPass pass,
+            ChunkCameraContext cameraContext) {
+        // region step 4
+        if (!CombinedRenderSectionContainer.getTheFDirtyList().remove(pass)) {
+            return this.passToMaxMeshCount[pass.ordinal()] != 0;
+        }
+
+        @Structured(ChunkMeshPassStruct) TripleBufferedPersistentMappedBuffer tripleBufferedPersistentMappedBuffer =
+                this.meshLocationBuffers.get(pass);
+
+        @Structured(ChunkMeshPassStruct) ByteBuffer targetBuffer =
+                tripleBufferedPersistentMappedBuffer.start(commandList);
+
+        commandList.createDataBase(
+                GlBufferTarget.ATOMIC_COUNTER_BUFFERS,
+                0,
+                this.atomicCounters,
+                4,
+                GlBufferUsage.DYNAMIC_DRAW
+        );
+
+        int meshCount = this.drawCallInputManager.uploadPass(
+                pass,
+                this.vertexFormat,
+                targetBuffer,
+                cameraContext);
+
+        // flush the buffer to the gpu
+        tripleBufferedPersistentMappedBuffer.flush(commandList);
+
+
+        this.passToMaxMeshCount[pass.ordinal()] = meshCount;
+        if (meshCount == 0) {
+            return false;
+        }
+
+        // TODO place these constants somewhere
+        commandList.bindBufferBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 0, this.computeInputsBuffer);
+        commandList.createDataBase(
+                GlBufferTarget.SHADER_STORAGE_BUFFERS, 1, this.drawPassIndirectCommandBuffers.get(pass),
+                (long) meshCount * DrawElementsIndirectCommandStruct.size, GlBufferUsage.STREAM_COPY);
+        tripleBufferedPersistentMappedBuffer.bind(commandList, GlBufferTarget.SHADER_STORAGE_BUFFERS, 3);
+
+        this.generatePassCommandsProgram.bind();
+        commandList.dispatchCompute(meshCount, 1, 1);
+
+        // copy the mesh command size;
+        commandList.copyBufferSubData(
+                this.atomicCounters, this.parameterBuffer, 0, (1L + pass.ordinal()) << 2, 4);
+
+        // mark buffer as done
+        tripleBufferedPersistentMappedBuffer.done(commandList);
+
+        // endregion
+
+        return true;
+    }
+
+    private final int[] passToMaxMeshCount = new int[BlockRenderPass.COUNT];
+
+
     @Override
     public void render(MatrixStack matrixStack, CommandList commandList, BlockRenderPass pass, ChunkCameraContext camera) {
         var profiler = this.profiler;
         profiler.push("GpuCullingBackend:renderStep:" + pass);
 
-        profiler.push("step 4");
-
-        // region step 4
-        try (var stack = MemoryStack.stackPush()) {
-            // TODO use better way to clear atomic counter
-            commandList.uploadDataBase(
-                    GlBufferTarget.ATOMIC_COUNTER_BUFFERS,
-                    0,
-                    this.atomicCounters,
-                    stack.calloc(4),
-                    GlBufferUsage.DYNAMIC_DRAW
-            );
+        profiler.push("step4");
+        if (!this.updateDrawPassBuffer(commandList, pass, camera)) {
+            profiler.pop();
+            profiler.pop();
         }
 
-
-        long mi = this.drawCallInputManager.uploadPass(commandList, pass, this.vertexFormat, this.meshInfoCommandBuffer, camera);
-        int i = (int) mi; // lower 32 bits
-        int m = (int) (mi >>> 32); // upper 32 bits;
-
-        if (i == 0) {
+        profiler.swap("step 5");
+        int maxDrawCount = this.passToMaxMeshCount[pass.ordinal()];
+        if (maxDrawCount == 0) {
             profiler.pop();
             profiler.pop();
             return;
         }
-
-        commandList.bindBufferBase(GlBufferTarget.SHADER_STORAGE_BUFFERS, 0, this.computeInputsBuffer);
-        commandList.createDataBase(
-                GlBufferTarget.SHADER_STORAGE_BUFFERS, 1, this.firstPassCommandBuffer,
-                (long) i * DrawElementsIndirectCommandStruct.size, GlBufferUsage.STREAM_COPY);
-        commandList.bindBuffer(GlBufferTarget.DRAW_INDIRECT_BUFFER, this.firstPassCommandBuffer);
-        commandList.bindBuffer(GlBufferTarget.PARAMETER_BUFFER, this.atomicCounters);
-
-
-        this.generatePassCommandsProgram.bind();
-        GL46C.glDispatchCompute(i, 1, 1);
-
-        // endregion
-        profiler.swap("step 5");
 
         // region step 5
         super.begin(pass, matrixStack);
 
         GlTessellation tessellation = this.createTessellation(commandList, CombinedRenderSectionContainer.getTheFArenas(commandList));
 
-        try (var drawCommandList = commandList.beginTessellating(tessellation)) {
+        commandList.bindBuffer(GlBufferTarget.PARAMETER_BUFFER, this.parameterBuffer);
+        commandList.bindBuffer(GlBufferTarget.DRAW_INDIRECT_BUFFER, this.drawPassIndirectCommandBuffers.get(pass));
 
+        try (var drawCommandList = commandList.beginTessellating(tessellation)) {
             // todo add to DrawCommandList?
+
 
             ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
                     GlPrimitiveType.TRIANGLES.getId(),
                     GL46C.GL_UNSIGNED_INT,
                     0L,
-                    0L,
-                    i,
+                    (1L + pass.ordinal()) << 2,
+                    maxDrawCount,
                     0
             );
 

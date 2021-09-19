@@ -138,6 +138,14 @@ public class GLRenderDevice implements RenderDevice {
         }
 
         @Override
+        public void bindBufferRange(GlBufferTarget target, int index, GlBuffer buffer, long offset, long size) {
+            this.stateTracker.makeBufferActive(target, buffer);
+
+            // TODO: use state tracker
+            GL32C.glBindBufferRange(target.getTargetParameter(), index, buffer.handle(), offset, size);
+        }
+
+        @Override
         public void createData(GlBufferTarget target, GlMutableBuffer buffer, long size, GlBufferUsage usage) {
             this.bindBuffer(target, buffer);
 
@@ -219,11 +227,26 @@ public class GLRenderDevice implements RenderDevice {
         }
 
         @Override
+        public GlImmutableBuffer createImmutableBuffer() {
+            return new GlImmutableBuffer();
+        }
+
+        @Override
         public GlTessellation createTessellation(GlPrimitiveType primitiveType, TessellationBinding[] bindings, GlBuffer indexBuffer) {
             GlVertexArrayTessellation tessellation = new GlVertexArrayTessellation(new GlVertexArray(), primitiveType, bindings, indexBuffer);
             tessellation.init(this);
 
             return tessellation;
+        }
+
+        @Override
+        public long createFence() {
+            return GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        }
+
+        @Override
+        public int clientWaitSync(long fence, long timeout) {
+            return GL32C.glClientWaitSync(fence, GL32C.GL_SYNC_FLUSH_COMMANDS_BIT, timeout);
         }
     }
 

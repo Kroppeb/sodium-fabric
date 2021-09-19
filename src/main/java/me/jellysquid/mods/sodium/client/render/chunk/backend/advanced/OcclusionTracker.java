@@ -27,7 +27,10 @@ public class OcclusionTracker implements VisibilityTracker {
     private final TornadoChunkRender tornadoChunkRender;
     private RenderSectionManager renderSectionManager;
 
+    private boolean occlusionDataDirty = false;
+
     public OcclusionTracker(TornadoChunkRender tornadoChunkRender) {
+        this.occlusionData.defaultReturnValue(Integer.MIN_VALUE);
         this.tornadoChunkRender = tornadoChunkRender;
     }
 
@@ -38,7 +41,7 @@ public class OcclusionTracker implements VisibilityTracker {
         // temp
         this.todo.forEach(this.renderSectionManager::schedulePendingUpdates);
 
-        tornadoChunkRender.update(camera, frustum, frame, spectator);
+        this.tornadoChunkRender.update(camera, frustum, frame, spectator);
     }
 
     @Override
@@ -69,9 +72,16 @@ public class OcclusionTracker implements VisibilityTracker {
 
     private final Set<RenderSection> todo = new HashSet<>();
 
+    private void updateOcclusionData(RenderSection section, int data){
+        // assert data == data & 0b111_111;
+        if(data != this.occlusionData.put(section.getChunkPosAsLong(), data)){
+            this.occlusionDataDirty = true;
+        }
+    }
+
     @Override
     public void addSection(RenderSection section) {
-        this.occlusionData.put(section.getChunkPosAsLong(), 0b111_111);
+        this.updateOcclusionData(section, 0b111_111);
         this.todo.add(section);
     }
 
@@ -80,21 +90,23 @@ public class OcclusionTracker implements VisibilityTracker {
         this.todo.remove(section);
         this.nonEmptySections.remove(section.getChunkPosAsLong());
         this.occlusionData.remove(section.getChunkPosAsLong());
+        this.occlusionDataDirty = true;
     }
 
     @Override
     public void updateSection(RenderSection section) {
         if (section.isEmpty()) {
             this.nonEmptySections.remove(section.getChunkPosAsLong());
-            this.occlusionData.put(section.getChunkPosAsLong(), 0);
+            this.updateOcclusionData(section, 0);
         } else {
             this.nonEmptySections.put(section.getChunkPosAsLong(), section);
-            this.occlusionData.put(section.getChunkPosAsLong(), convertDataToOcclusion(section.getData().getOcclusionData()));
+            this.updateOcclusionData(section, convertDataToOcclusion(section.getData().getOcclusionData()));
         }
     }
 
     private static int convertDataToOcclusion(ChunkOcclusionData data) {
         if (data == null) {
+            // TODO: shouldn't this be 0b111_111?
             return -1; // absent, all blocked
         }
 

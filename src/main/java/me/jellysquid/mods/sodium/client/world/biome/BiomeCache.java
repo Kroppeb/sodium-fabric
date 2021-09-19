@@ -22,7 +22,7 @@ public class BiomeCache {
     }
 
     public Biome getBiome(BiomeAccess.Storage storage, int x, int y, int z) {
-        int idx = ((z & 15) << 4) | (x & 15);
+        int idx = (z & 15) << 4 | x & 15;
 
         Biome biome = this.biomes[idx];
 
